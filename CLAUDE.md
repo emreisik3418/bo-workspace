@@ -4,10 +4,15 @@ Bu dosya, bu repoda (ve aynı ortamdaki yeni BO projelerinde) çalışırken ö�
 Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 
 ## Bu repo (bo-workspace)
-- Genel BO SDK işlerinin toplandığı çalışma alanı. Her iş repo kökünde kendi klasöründe durur (ör. `unx-java/...`, `unv-csharp/...`).
-- İlk uygulamalar `universe-object-mapping` reposunda; aşağıdaki notlar oradan devralındı.
-- Bu repodaki işler (Java olanlar mevcut IntelliJ projesine yeni paket olarak kopyalanır):
-  - `report-keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`, CSV yedek + doğrulama.
+- Genel BO SDK işleri. Java işleri tek IntelliJ projesinde: `bo-tools/` (kullanıcıda `C:\dev\bo-workspace\bo-tools`),
+  her iş kendi paketinde (`com.akbank.analytics.applications.bo.<iş>`), dokümanı `bo-tools/<iş>.md`.
+- Universe obje/tablo eşlemesi ayrı iş olarak `universe-object-mapping` reposunda kalır; onunla ilgili işler oraya.
+- `bo-tools` içindeki `app`, `config`, `credential`, `model`, `sdk` paketleri universe-object-mapping'dekinin kopyası;
+  birinde düzeltme yapılırsa diğerine de taşı. Ortam seçimi + yeniden denemeli logon: `common.BoLogon`.
+- Toplu çalıştırma: `bo-tools\run_*.bat` → `C:\batchs\BusinessObjects\BOTOOLS\lib\bo-tools.jar`.
+- İşler:
+  - `keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`,
+    CSV yedek + doğrulama. SDK: `IInfoObject.getKeyword/setKeyword/save` (gerçek SDK'da henüz doğrulanmadı).
 
 ## Çalışma şekli (kullanıcı ortamı)
 - Kullanıcı bir banka iş bilgisayarında çalışıyor. GitHub'dan **indiremiyor**; dosyaları repodan elle kopyala-yapıştır yapıyor.
@@ -78,7 +83,7 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 Ayrıntılar: o reponun kök `README.md` ve `unx-java/README.md` dosyaları.
 
 ## Yeni proje / yeni iş eklerken
-- Aynı IntelliJ projesine yeni paket + yeni main class olarak ekle (config, Sbox, BoSession, RunLog ortak kalsın);
+- Universe eşleme dışı işler `bo-tools` projesine yeni paket + yeni main class olarak eklenir (config, Sbox, BoSession, RunLog ortak kalsın);
   Run Configuration'ı kopyala (Ctrl+D), sadece main class ve argümanları değiştir.
 - Ortak kalıplar: `logonWithRetry` (4 deneme, 2 dk), `RunLog` (konsol + `logs\<önek>_*.log`, stack trace sadece dosyada),
   hata veren universe'ü atla ve devam et, boş liste / hiç okunamadıysa DB'ye dokunma.

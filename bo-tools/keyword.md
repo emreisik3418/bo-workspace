@@ -2,19 +2,15 @@
 
 Bir txt listesindeki CUID'lere ait raporların **Properties > Keywords** alanına etiket ekler (varsayılan `Arşiv`).
 
-## Kurulum (IntelliJ)
-`src/com/akbank/analytics/applications/bo/keyword/` altındaki 3 dosyayı mevcut projenizin (universe-object-mapping)
-`src` klasörüne aynı paket yoluyla kopyalayın. Ortak sınıflar (`AppConfig`, `SboxCredentialProvider`, `BoSession`, `RunLog`)
-oradan kullanılır, yeni kütüphane gerekmez.
-
+## Dosyalar (`src/com/akbank/analytics/applications/bo/keyword/`)
 | Dosya | İçerik |
 |---|---|
 | `ReportKeywordApp.java` | Ana sınıf: liste → CMS sorgusu → plan CSV → (--apply) kaydet → doğrula |
 | `CuidList.java` | txt okuma: satır başına bir CUID, boş / `#` satırlar atlanır, tekrarlar bir kez işlenir |
 | `KeywordTag.java` | Etiket kuralları: varsa dokunma, yoksa mevcut keyword'lerin sonuna `, Arşiv` ekle |
 
-Run Configuration: `DescriptionUpdateApp`'inkini kopyalayın (Ctrl+D), main class'ı
-`com.akbank.analytics.applications.bo.keyword.ReportKeywordApp` yapın. VM options ve working directory aynı kalır.
+**Main class:** `com.akbank.analytics.applications.bo.keyword.ReportKeywordApp`
+(VM options ve working directory için bkz. `README.md`). Toplu çalıştırma: `run_keyword.bat`.
 
 ## Parametreler
 ```

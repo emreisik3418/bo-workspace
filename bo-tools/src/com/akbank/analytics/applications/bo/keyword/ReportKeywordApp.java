@@ -1,6 +1,7 @@
 package com.akbank.analytics.applications.bo.keyword;
 
 import com.akbank.analytics.applications.bo.app.RunLog;
+import com.akbank.analytics.applications.bo.common.BoLogon;
 import com.akbank.analytics.applications.bo.config.AppConfig;
 import com.akbank.analytics.applications.bo.credential.SboxCredentialProvider;
 import com.akbank.analytics.applications.bo.model.BoEnvironment;
@@ -47,9 +48,6 @@ import java.util.TreeMap;
  */
 public final class ReportKeywordApp {
 
-    private static final String AUTH_TYPE = System.getProperty("bo.authType", "secEnterprise");
-    private static final int LOGON_ATTEMPTS = 4;
-    private static final long LOGON_RETRY_WAIT_MS = 2 * 60 * 1000L;
     /** CMS sorgusunda IN listesine tek seferde konan CUID sayısı. */
     private static final int BATCH_SIZE = 100;
 
@@ -127,9 +125,9 @@ public final class ReportKeywordApp {
         }
 
         AppConfig config = AppConfig.load(Paths.get(positional.get(0)));
-        BoEnvironment env = pickEnvironment(config, envArg);
+        BoEnvironment env = BoLogon.pickEnvironment(config, envArg);
         if (env == null) {
-            log.error("Ortam seçilemedi. credentials.json'daki ortamlar: " + cmsList(config) + ". --env ile belirtin.");
+            log.error("Ortam seçilemedi. credentials.json'daki ortamlar: " + BoLogon.cmsList(config) + ". --env ile belirtin.");
             return 2;
         }
         SboxCredentialProvider sbox = new SboxCredentialProvider(
@@ -138,7 +136,7 @@ public final class ReportKeywordApp {
         Credential boCredential = sbox.get(env.getSbox());
         Path csv = base.resolve("reports").resolve("keyword_" + stamp + ".csv");
 
-        try (BoSession session = logonWithRetry(cms, boCredential, log)) {
+        try (BoSession session = BoLogon.logonWithRetry(cms, boCredential, log)) {
             IInfoStore store = session.getInfoStore();
             log.info("[" + cms + "] Bağlanıldı.");
 
@@ -298,36 +296,6 @@ public final class ReportKeywordApp {
             this.status = status;
             this.cuid = cuid;
             this.object = object;
-        }
-    }
-
-    private static BoEnvironment pickEnvironment(AppConfig config, String envArg) {
-        if (envArg == null) {
-            return config.getEnvironments().size() == 1 ? config.getEnvironments().get(0) : null;
-        }
-        for (BoEnvironment e : config.getEnvironments()) {
-            if (e.getCms().equalsIgnoreCase(envArg.trim())) return e;
-        }
-        return null;
-    }
-
-    private static String cmsList(AppConfig config) {
-        List<String> l = new ArrayList<>();
-        for (BoEnvironment e : config.getEnvironments()) l.add(e.getCms());
-        return String.join(", ", l);
-    }
-
-    /** Geçici hatalarda (lisans dolu, ağ vb.) LOGON_ATTEMPTS kez, LOGON_RETRY_WAIT_MS arayla dener. */
-    private static BoSession logonWithRetry(String cms, Credential credential, RunLog log) throws Exception {
-        for (int attempt = 1; ; attempt++) {
-            try {
-                return BoSession.logon(cms, credential, AUTH_TYPE);
-            } catch (Exception e) {
-                if (attempt >= LOGON_ATTEMPTS) throw e;
-                log.warn(String.format("[%s] CMS logon başarısız (deneme %d/%d), %d dk sonra tekrar denenecek: %s",
-                        cms, attempt, LOGON_ATTEMPTS, LOGON_RETRY_WAIT_MS / 60000, RunLog.describe(e)));
-                Thread.sleep(LOGON_RETRY_WAIT_MS);
-            }
         }
     }
 }

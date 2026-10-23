@@ -1,0 +1,16 @@
+# Hassas / ortama özel
+credentials.json
+**/config/credentials.json
+
+# IntelliJ / Java
+.idea/
+out/
+*.iml
+
+# Çalışma klasörleri
+work/
+logs/
+reports/
+backup/
+retrieve/
+*.log
