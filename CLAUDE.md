@@ -6,6 +6,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 ## Bu repo (bo-workspace)
 - Genel BO SDK işlerinin toplandığı çalışma alanı. Her iş repo kökünde kendi klasöründe durur (ör. `unx-java/...`, `unv-csharp/...`).
 - İlk uygulamalar `universe-object-mapping` reposunda; aşağıdaki notlar oradan devralındı.
+- Bu repodaki işler (Java olanlar mevcut IntelliJ projesine yeni paket olarak kopyalanır):
+  - `report-keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`, CSV yedek + doğrulama.
 
 ## Çalışma şekli (kullanıcı ortamı)
 - Kullanıcı bir banka iş bilgisayarında çalışıyor. GitHub'dan **indiremiyor**; dosyaları repodan elle kopyala-yapıştır yapıyor.
