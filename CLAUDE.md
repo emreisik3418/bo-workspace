@@ -3,6 +3,10 @@
 Bu dosya, bu repoda (ve aynı ortamdaki yeni BO projelerinde) çalışırken öğrenilmiş her şeyin özetidir.
 Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 
+## Bu repo (bo-workspace)
+- Genel BO SDK işlerinin toplandığı çalışma alanı. Her iş repo kökünde kendi klasöründe durur (ör. `unx-java/...`, `unv-csharp/...`).
+- İlk uygulamalar `universe-object-mapping` reposunda; aşağıdaki notlar oradan devralındı.
+
 ## Çalışma şekli (kullanıcı ortamı)
 - Kullanıcı bir banka iş bilgisayarında çalışıyor. GitHub'dan **indiremiyor**; dosyaları repodan elle kopyala-yapıştır yapıyor.
   - Dosya güncellerken her zaman "Ctrl+A ile tümünü seçip yapıştırın" de (yoksa eski içerik altta kalıyor → CS1529 / duplicate class).
@@ -16,7 +20,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 ## Java (UNX, SL SDK) — ortam
 - IDE: IntelliJ. JDK: **SAP JVM 8** → `C:\Program Files (x86)\SAP BusinessObjects\SAP BusinessObjects Enterprise XI 4.0\win64_x64\sapjvm`
   (Java 7 JRE veya başka JDK ile çalışmaz). Kod Java 8 ile uyumlu olmalı.
-- Projeyi **iç klasörden** aç: `C:\dev\universe-object-mapping\universe-object-mapping` (dıştan açınca kütüphaneler yüklenmiyor).
+- IntelliJ projesini **iç klasörden** aç (repo klasörünün içindeki proje klasörü; ör. eski repoda
+  `C:\dev\universe-object-mapping\universe-object-mapping`). Dıştan açınca kütüphaneler yüklenmiyor.
 - Kütüphaneler:
   - `BO_SDK` = **sadece** `SL SDK\java\sl_sdk.jar` (Compile). Manifest Class-Path'i tüm BO jar'larını yükler.
     Eski "OLD" jar'ları veya tek tek BO jar'larını ekleme → CORBA / `CrystalEnterprise` bulunamadı hataları.
@@ -61,14 +66,14 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
   `endpoint, username, password, environments[{appName, subAppName, ip, sensitiveDataName, system:{cms:"HOST:6400"}}], db[{..., jdbcUrl}]`.
   `cms` değeri `HOST:6400` olmalı; DB'de `SYSTEM` kolonu olarak da kullanılıyor.
 
-## Bu repodaki uygulamalar
+## Mevcut uygulamalar (`universe-object-mapping` reposunda)
 | Uygulama | Ne yapar |
 |---|---|
 | `unx-java` `UniverseObjectMappingApp` | UNX obje (OM) + tablo (TM) eşlemesi → `POPR.SDK_METADATA_UNIVERSEOM_JOB` / `..._UNIVERSETM_JOB`; SYSTEM başına delete+insert, sadece `.unx` satırları |
 | `unx-java` `DescriptionUpdateApp` | Bir UNX'in obje açıklamalarını Oracle sorgusundan (OBJECT_PATH, DESCRIPTION) günceller; dry-run / `--apply` / `--diag`, yedek + doğrulama |
 | `unv-csharp` (.NET 4.8 x86, Designer COM `dynamic`) | UNV OM + TM; universe başına yazım, `run` / `retry` / `dbreport` / `purge` |
 
-Ayrıntılar: kök `README.md`, `unx-java/README.md`.
+Ayrıntılar: o reponun kök `README.md` ve `unx-java/README.md` dosyaları.
 
 ## Yeni proje / yeni iş eklerken
 - Aynı IntelliJ projesine yeni paket + yeni main class olarak ekle (config, Sbox, BoSession, RunLog ortak kalsın);
