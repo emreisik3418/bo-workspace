@@ -155,12 +155,18 @@ public final class WebiDocumentsApp {
 
             // ---- 2) Sorgular (REST)
             WebiRestClient rest = null;
+            String restMode = null;
             if (!noQuery) {
                 String restUrl = restArg != null ? restArg : WebiRestClient.defaultBaseUrl(cms);
-                IEnterpriseSession es = session.getEnterpriseSession();
-                rest = new WebiRestClient(restUrl, () -> restToken(es));
-                rest.ping();
-                log.info("RESTful bağlantısı tamam: " + restUrl);
+                String[] mode = new String[1];
+                rest = connectRest(restUrl, session.getEnterpriseSession(), boCredential, docs.get(0).id, mode, log);
+                if (rest == null) {
+                    log.error("RESTful'a hiçbir token yöntemiyle bağlanılamadı (" + restUrl + "). Ayrıntı yukarıda."
+                            + " Sadece CMS bilgisi için --no-query ile çalıştırabilirsiniz.");
+                    return 2;
+                }
+                restMode = mode[0];
+                log.info("RESTful bağlantısı tamam: " + restUrl + " (token yöntemi: " + restMode + ")");
             }
             long started = System.currentTimeMillis();
             int done = 0, closeFailed = 0;
@@ -190,6 +196,13 @@ public final class WebiDocumentsApp {
                 }
             }
             if (closeFailed > 0) log.warn("Kapatılamayan doküman sayısı: " + closeFailed);
+            if (rest != null && MODE_REST.equals(restMode)) {
+                try {
+                    rest.logoff();
+                } catch (Exception e) {
+                    log.warn("REST logoff başarısız: " + RunLog.describe(e));
+                }
+            }
 
             // ---- 3) Veri kaynağı SI_ID -> CUID / ad
             Set<Integer> ids = new LinkedHashSet<>();
@@ -278,12 +291,50 @@ public final class WebiDocumentsApp {
         return out;
     }
 
-    /** REST için logon token. -Dbo.restToken=serialized verilirse oturumun serialize hali kullanılır. */
-    private static String restToken(IEnterpriseSession es) throws Exception {
-        if ("serialized".equalsIgnoreCase(System.getProperty("bo.restToken"))) {
-            return es.getSerializedSession();
+    static final String MODE_LOGON = "logon";           // CMS oturumundan createLogonToken
+    static final String MODE_SERIALIZED = "serialized"; // CMS oturumunun serialize hali
+    static final String MODE_REST = "rest";             // REST'in kendi logon'u (/logon/long), +1 oturum
+
+    /**
+     * Token yöntemlerini sırayla dener; ilk rapor için dataproviders çağrısı başarılı olan yöntemi döner.
+     * -Dbo.restToken=logon|serialized|rest verilirse sadece o denenir. Hiçbiri olmazsa null.
+     */
+    private static WebiRestClient connectRest(String restUrl, IEnterpriseSession es, Credential cred, int probeDocId,
+                                              String[] modeOut, RunLog log) {
+        String forced = System.getProperty("bo.restToken");
+        String[] modes = forced != null ? new String[]{forced.trim().toLowerCase()}
+                : new String[]{MODE_LOGON, MODE_SERIALIZED, MODE_REST};
+        for (String mode : modes) {
+            WebiRestClient client = null;
+            try {
+                WebiRestClient.TokenSource src;
+                if (MODE_LOGON.equals(mode)) {
+                    src = () -> es.getLogonTokenMgr().createLogonToken("", TOKEN_MINUTES, TOKEN_LOGONS);
+                } else if (MODE_SERIALIZED.equals(mode)) {
+                    src = es::getSerializedSession;
+                } else if (MODE_REST.equals(mode)) {
+                    src = () -> WebiRestClient.restLogon(restUrl, cred.getUsername(), cred.getPassword(), BoLogon.AUTH_TYPE);
+                } else {
+                    log.error("Bilinmeyen bo.restToken değeri: " + mode + " (logon / serialized / rest)");
+                    return null;
+                }
+                client = new WebiRestClient(restUrl, src);
+                client.dataProviders(probeDocId);
+                try {
+                    client.closeDocument(probeDocId);
+                } catch (Exception ignore) {
+                    // kapatma hatası bağlantı testini bozmasın
+                }
+                modeOut[0] = mode;
+                return client;
+            } catch (Exception e) {
+                log.warn("REST token yöntemi '" + mode + "' çalışmadı: " + RunLog.describe(e));
+                if (client != null && MODE_REST.equals(mode)) {
+                    try { client.logoff(); } catch (Exception ignore) { /* zaten hata var */ }
+                }
+            }
         }
-        return es.getLogonTokenMgr().createLogonToken("", TOKEN_MINUTES, TOKEN_LOGONS);
+        return null;
     }
 
     static Integer parseId(String s) {

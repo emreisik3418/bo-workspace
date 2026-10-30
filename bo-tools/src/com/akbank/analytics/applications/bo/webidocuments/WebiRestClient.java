@@ -49,7 +49,7 @@ final class WebiRestClient {
     private String token;
 
     WebiRestClient(String baseUrl, TokenSource tokens) throws Exception {
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
+        this.baseUrl = trim(baseUrl);
         this.tokens = tokens;
         this.token = tokens.newToken();
     }
@@ -70,19 +70,65 @@ final class WebiRestClient {
         call("PUT", "/raylight/v1/documents/" + documentId, "{\"document\":{\"state\":\"Unused\"}}");
     }
 
-    /** Bağlantı testi: sunucu ayakta ve token geçerli mi. */
-    void ping() throws Exception {
-        call("GET", "/raylight/v1/about", null);
+    /**
+     * REST'in kendi logon'u: POST /logon/long -> logonToken. CMS oturumundan alınan token Webi oturumu
+     * açamadığında kullanılır (WSR 00999 "ReportEngineContext ... null object 'reCtx'").
+     * Not: ayrı bir oturum açar (1 lisans daha); iş sonunda logoff() çağrılmalı.
+     */
+    static String restLogon(String baseUrl, String user, String password, String auth) throws Exception {
+        String body;
+        try {
+            JSONObject o = new JSONObject();
+            o.put("userName", user);
+            o.put("password", password);
+            o.put("auth", auth);
+            body = o.toString();
+        } catch (JSONException e) {
+            throw new IOException("logon istegi hazirlanamadi: " + e.getMessage(), e);
+        }
+        String text = http(trim(baseUrl), "POST", "/logon/long", body, null);
+        try {
+            String t = new JSONObject(text).optString("logonToken", "").trim();
+            if (t.startsWith("\"") && t.endsWith("\"") && t.length() > 1) t = t.substring(1, t.length() - 1);
+            if (t.isEmpty()) throw new IOException("REST logon yanitinda logonToken yok");
+            return t;
+        } catch (JSONException e) {
+            throw new IOException("REST logon yaniti ayristirilamadi: " + shorten(text), e);
+        }
+    }
+
+    /** REST oturumunu kapatır (sadece restLogon ile açıldıysa anlamlı). */
+    void logoff() throws Exception {
+        call("POST", "/logoff", null);
     }
 
     private String call(String method, String path, String body) throws Exception {
+        try {
+            return http(baseUrl, method, path, body, token);
+        } catch (HttpStatusException e) {
+            if (e.code != 401) throw e;
+            token = tokens.newToken();                // token süresi dolmuş olabilir: bir kez yenile
+            return http(baseUrl, method, path, body, token);
+        }
+    }
+
+    static final class HttpStatusException extends IOException {
+        final int code;
+        HttpStatusException(int code, String msg) {
+            super(msg);
+            this.code = code;
+        }
+    }
+
+    /** Tek HTTP çağrısı; ağ hatasında bir kez daha dener. 400+ -> HttpStatusException. */
+    private static String http(String baseUrl, String method, String path, String body, String token) throws Exception {
         for (int attempt = 1; ; attempt++) {
             HttpURLConnection c = (HttpURLConnection) new URL(baseUrl + path).openConnection();
             c.setRequestMethod(method);
             c.setConnectTimeout(CONNECT_TIMEOUT_MS);
             c.setReadTimeout(READ_TIMEOUT_MS);
             c.setRequestProperty("Accept", "application/json");
-            c.setRequestProperty("X-SAP-LogonToken", "\"" + token + "\"");
+            if (token != null) c.setRequestProperty("X-SAP-LogonToken", "\"" + token + "\"");
             if (body != null) {
                 c.setDoOutput(true);
                 c.setRequestProperty("Content-Type", "application/json");
@@ -95,20 +141,20 @@ final class WebiRestClient {
                 code = c.getResponseCode();
             } catch (IOException e) {
                 c.disconnect();
-                if (attempt >= 2) throw e;          // ağ hatasında bir kez daha dene
+                if (attempt >= 2) throw e;
                 continue;
             }
             String text = read(code >= 400 ? c.getErrorStream() : c.getInputStream());
             c.disconnect();
-            if (code == 401 && attempt < 2) {       // token süresi dolmuş olabilir
-                token = tokens.newToken();
-                continue;
-            }
             if (code >= 400) {
-                throw new IOException("HTTP " + code + " " + method + " " + path + " : " + shorten(text));
+                throw new HttpStatusException(code, "HTTP " + code + " " + method + " " + path + " : " + shorten(text));
             }
             return text;
         }
+    }
+
+    private static String trim(String url) {
+        return url.endsWith("/") ? url.substring(0, url.length() - 1) : url;
     }
 
     /**

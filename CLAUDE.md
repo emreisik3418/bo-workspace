@@ -15,7 +15,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
     CSV yedek + doğrulama. SDK: `IInfoObject.getKeyword/setKeyword/save` (gerçek SDK'da henüz doğrulanmadı).
   - `webidocuments` `WebiDocumentsApp`: Public Folders altındaki Webi raporlarının sorgu (data provider) + universe
     bilgilerini `POPR.SDK_METADATA_WEBIDOCUMENTS_JOB` tablosuna yazar (satır = rapor x sorgu, SYSTEM başına delete+insert).
-    Sorgular Webi RESTful (raylight, port 6405, `X-SAP-LogonToken` = CMS oturumundan `createLogonToken`);
+    Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
+    ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);
     REST hatasında CMS `SI_UNIVERSE`/`SI_DSL_UNIVERSE` yedeği. Dry-run = CSV; `--apply` = DB. Ayrıntı: `bo-tools/webidocuments.md`.
 
 ## Çalışma şekli (kullanıcı ortamı)

@@ -42,8 +42,12 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
 - `--no-query`: REST'e gitmeden yalnız CMS (hızlı); satır = rapor × universe, QUERY alanları boş.
 - `--apply`: **verilmezse DRY-RUN**, DB'ye yazılmaz, sadece CSV.
 - `--force`: REST hatası raporların %10'unu geçerse DB'ye yazılmaz; yine de yazmak için.
-- REST token: varsayılan `createLogonToken`. Sorun olursa VM option `-Dbo.restToken=serialized` ile
-  oturumun serialize hali denenir.
+- REST token: ilk raporun sorguları okunarak sırayla denenir, çalışan kullanılır (log: "token yöntemi: ..."):
+  1. `logon`: CMS oturumundan `createLogonToken`
+  2. `serialized`: CMS oturumunun serialize hali
+  3. `rest`: REST'in kendi logon'u (`POST /logon/long`, aynı BO kullanıcısı). **+1 oturum/lisans**; iş sonunda logoff.
+  Bu sunucuda 1. yöntem `WSR 00999 ... ReportEngineContext ... 'reCtx'` hatası verdi.
+  Tek bir yöntemi zorlamak için VM option: `-Dbo.restToken=logon|serialized|rest`.
 
 ## Çıktılar
 - `reports\webidocuments_<zaman>.csv`: tablodaki kolonlar + `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`.
