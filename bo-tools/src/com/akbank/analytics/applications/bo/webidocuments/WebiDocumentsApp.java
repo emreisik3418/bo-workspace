@@ -35,7 +35,7 @@ import java.util.TreeMap;
  *                    [--folder "/Public Folders/AKBANK"] [--limit N] [--no-query] [--table SEMA.TABLO]
  *                    [--apply] [--force]
  *
- *   --rest     : RESTful adresi; verilmezse http://<CMS sunucusu>:6405/biprws
+ *   --rest     : RESTful adresi; verilmezse credentials.json system.rest, o da yoksa http://<CMS sunucusu>:6405/biprws
  *   --folder   : sadece bu klasörün altı (test için; --apply ile kullanılamaz)
  *   --limit    : ilk N rapor (test için; --apply ile kullanılamaz)
  *   --no-query : REST'e gitmeden sadece CMS: rapor x universe satırları, QUERY alanları boş
@@ -157,9 +157,24 @@ public final class WebiDocumentsApp {
             WebiRestClient rest = null;
             String restMode = null;
             if (!noQuery) {
-                String restUrl = restArg != null ? restArg : WebiRestClient.defaultBaseUrl(cms);
+                RestEndpointConfig rc = RestEndpointConfig.read(Paths.get(positional.get(0)), cms);
+                String restUrl;
+                String source;
+                if (restArg != null) {
+                    restUrl = WebiRestClient.normalizeBaseUrl(restArg);
+                    source = "--rest";
+                } else if (rc.restUrl != null) {
+                    restUrl = WebiRestClient.normalizeBaseUrl(rc.restUrl);
+                    source = "credentials.json system.rest";
+                } else {
+                    restUrl = WebiRestClient.defaultBaseUrl(cms);
+                    source = "varsayılan, CMS sunucusu";
+                }
+                String forced = System.getProperty("bo.restToken") != null ? System.getProperty("bo.restToken") : rc.restToken;
+                log.info("RESTful adresi: " + restUrl + " (" + source + ")"
+                        + (forced != null ? ", token yöntemi: " + forced : ", token yöntemleri sırayla denenecek"));
                 String[] mode = new String[1];
-                rest = connectRest(restUrl, session.getEnterpriseSession(), boCredential, docs.get(0).id, mode, log);
+                rest = connectRest(restUrl, forced, session.getEnterpriseSession(), boCredential, docs.get(0).id, mode, log);
                 if (rest == null) {
                     log.error("RESTful'a hiçbir token yöntemiyle bağlanılamadı (" + restUrl + "). Ayrıntı yukarıda."
                             + " Sadece CMS bilgisi için --no-query ile çalıştırabilirsiniz.");
@@ -297,11 +312,10 @@ public final class WebiDocumentsApp {
 
     /**
      * Token yöntemlerini sırayla dener; ilk rapor için dataproviders çağrısı başarılı olan yöntemi döner.
-     * -Dbo.restToken=logon|serialized|rest verilirse sadece o denenir. Hiçbiri olmazsa null.
+     * forced (-Dbo.restToken ya da credentials.json system.restToken) verilirse sadece o denenir. Hiçbiri olmazsa null.
      */
-    private static WebiRestClient connectRest(String restUrl, IEnterpriseSession es, Credential cred, int probeDocId,
-                                              String[] modeOut, RunLog log) {
-        String forced = System.getProperty("bo.restToken");
+    private static WebiRestClient connectRest(String restUrl, String forced, IEnterpriseSession es, Credential cred,
+                                              int probeDocId, String[] modeOut, RunLog log) {
         String[] modes = forced != null ? new String[]{forced.trim().toLowerCase()}
                 : new String[]{MODE_LOGON, MODE_SERIALIZED, MODE_REST};
         for (String mode : modes) {

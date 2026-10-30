@@ -60,6 +60,21 @@ final class WebiRestClient {
         return "http://" + host + ":6405/biprws";
     }
 
+    /**
+     * Kullanıcının verdiği adresi taban adrese çevirir:
+     *   "https://h:6405/biprws/logon/long" -> "https://h:6405/biprws"
+     *   "https://h:6405/"                  -> "https://h:6405/biprws"
+     *   "h:6405"                           -> "http://h:6405/biprws"
+     */
+    static String normalizeBaseUrl(String url) {
+        String u = url.trim();
+        if (!u.toLowerCase().startsWith("http://") && !u.toLowerCase().startsWith("https://")) u = "http://" + u;
+        while (u.endsWith("/")) u = u.substring(0, u.length() - 1);
+        int b = u.toLowerCase().indexOf("/biprws");
+        if (b >= 0) return u.substring(0, b + "/biprws".length());
+        return u + "/biprws";
+    }
+
     List<DataProvider> dataProviders(int documentId) throws Exception {
         String body = call("GET", "/raylight/v1/documents/" + documentId + "/dataproviders", null);
         return parseDataProviders(body);

@@ -9,6 +9,7 @@ Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe 
 | `WebiDocumentsApp.java` | Ana sınıf: parametreler → CMS → REST → CSV → (--apply) DB → doğrulama |
 | `CmsWebiReader.java` | CMS sorguları: klasörler, Webi raporları (sayfalı), veri kaynağı SI_ID → CUID / ad |
 | `CmsFolderPaths.java` | Klasör ID → `/Public Folders/...` yolu; kök = SI_ID 23 ya da SI_PARENTID 0 (bu CMS'te üst klasörler 0 geliyor); Public dışı (kişisel, Inbox) için null |
+| `RestEndpointConfig.java` | credentials.json'dan isteğe bağlı `system.rest` / `system.restToken` |
 | `WebiRestClient.java` | RESTful (raylight): `/documents/{id}/dataproviders`, dokümanı kapatma, token yenileme |
 | `WebiDocumentsDao.java` | Oracle: SYSTEM başına DELETE + batch INSERT, tek transaction |
 | `WebiDocument.java`, `WebiDocumentRow.java` | Rapor ve satır modelleri |
@@ -37,7 +38,14 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
 <credentials.json> [--env HOST:6400] [--rest http://HOST:6405/biprws] [--folder "/Public Folders/..."]
                    [--limit N] [--no-query] [--table SEMA.TABLO] [--apply] [--force]
 ```
-- `--rest`: verilmezse `http://<CMS sunucusu>:6405/biprws`. HTTPS ya da farklı port ise verin.
+- `--rest`: RESTful adresi. Öncelik: `--rest` > `credentials.json` `system.rest` > `http://<CMS sunucusu>:6405/biprws`.
+  Postman'de çalışan adres aynen verilebilir: sonundaki `/logon/long` vb. atılır, `/biprws` yoksa eklenir.
+  Hangi adresin kullanıldığı logda `RESTful adresi: ... (kaynak)` satırında yazar.
+- `credentials.json` içinde ortam başına (ortak `AppConfig`'e dokunmadan, `RestEndpointConfig` okur):
+  ```json
+  "system": { "cms": "BO-SUNUCU:6400", "rest": "https://REST-SUNUCU:6405/biprws", "restToken": "rest" }
+  ```
+  `restToken` verilirse sadece o yöntem kullanılır (çalışmayan yöntemler boşuna denenmez).
 - `--folder`, `--limit`: test için. **`--apply` ile kullanılamaz** (SYSTEM'in tüm satırları silinip bir kısmı yazılırdı).
 - `--no-query`: REST'e gitmeden yalnız CMS (hızlı); satır = rapor × universe, QUERY alanları boş.
 - `--apply`: **verilmezse DRY-RUN**, DB'ye yazılmaz, sadece CSV.
@@ -47,7 +55,7 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
   2. `serialized`: CMS oturumunun serialize hali
   3. `rest`: REST'in kendi logon'u (`POST /logon/long`, aynı BO kullanıcısı). **+1 oturum/lisans**; iş sonunda logoff.
   Bu sunucuda 1. yöntem `WSR 00999 ... ReportEngineContext ... 'reCtx'` hatası verdi.
-  Tek bir yöntemi zorlamak için VM option: `-Dbo.restToken=logon|serialized|rest`.
+  Tek bir yöntemi zorlamak için: `credentials.json` `system.restToken` ya da VM option `-Dbo.restToken=logon|serialized|rest` (VM option önceliklidir).
 
 ## Çıktılar
 - `reports\webidocuments_<zaman>.csv`: tablodaki kolonlar + `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`.
