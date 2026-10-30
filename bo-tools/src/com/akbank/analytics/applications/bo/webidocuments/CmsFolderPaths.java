@@ -33,6 +33,23 @@ final class CmsFolderPaths {
         return result;
     }
 
+    boolean contains(int folderId) { return names.containsKey(folderId); }
+
+    /** Teşhis: klasör zinciri, ör. "5012(Risk) -> 4100(AKBANK) -> 23(Public)" ya da "... -> 18(listede yok)". */
+    String trace(int folderId) {
+        StringBuilder sb = new StringBuilder();
+        Integer current = folderId;
+        for (int depth = 0; depth < MAX_DEPTH && current != null; depth++) {
+            if (sb.length() > 0) sb.append(" -> ");
+            if (current == PUBLIC_ROOT_ID) return sb.append(current).append("(Public)").toString();
+            String name = names.get(current);
+            if (name == null) return sb.append(current).append("(listede yok)").toString();
+            sb.append(current).append('(').append(name).append(')');
+            current = parents.get(current);
+        }
+        return sb.append(" ...").toString();
+    }
+
     private String build(int folderId) {
         StringBuilder sb = new StringBuilder();
         int current = folderId;

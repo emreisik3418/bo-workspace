@@ -46,12 +46,24 @@ final class CmsWebiReader {
             }
             if (page.size() < PAGE) break;
         }
+        // Teşhis: kökün (23) doğrudan altındaki klasörler okunabiliyor mu
+        IInfoObjects top = store.query("SELECT TOP 20 SI_ID, SI_NAME, SI_PARENTID, SI_KIND FROM CI_INFOOBJECTS"
+                + " WHERE SI_PARENTID=" + CmsFolderPaths.PUBLIC_ROOT_ID);
+        StringBuilder sb = new StringBuilder();
+        for (Object o : top) {
+            IInfoObject f = (IInfoObject) o;
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(f.getID()).append('(').append(f.getTitle()).append(' ').append(f.getKind())
+                    .append(paths.contains(f.getID()) ? "" : " LISTEDE YOK").append(')');
+        }
+        log.info("Kök (23) altındaki ilk nesneler: " + (sb.length() == 0 ? "YOK" : sb));
         return paths;
     }
 
     /** Public Folders altındaki Webi raporları (instance'lar hariç). folderPrefix verilirse sadece o yolun altı. */
     List<WebiDocument> listDocuments(CmsFolderPaths folders, String folderPrefix) throws SDKException {
         List<WebiDocument> result = new ArrayList<>();
+        Map<Integer, Integer> outside = new HashMap<>();   // teşhis: Public dışı kalan raporların üst klasörleri
         int lastId = 0;
         int seen = 0;
         while (true) {
@@ -65,7 +77,11 @@ final class CmsWebiReader {
                 lastId = Math.max(lastId, io.getID());
                 seen++;
                 String path = folders.pathOf(io.getParentID());
-                if (path == null) continue;                                      // Public Folders dışında
+                if (path == null) {                                              // Public Folders dışında
+                    Integer n = outside.get(io.getParentID());
+                    outside.put(io.getParentID(), n == null ? 1 : n + 1);
+                    continue;
+                }
                 if (folderPrefix != null && !underFolder(path, folderPrefix)) continue;
 
                 WebiDocument d = new WebiDocument();
@@ -89,7 +105,27 @@ final class CmsWebiReader {
             log.info("CMS'ten okunan Webi: " + seen + ", Public Folders altında: " + result.size());
             if (page.size() < PAGE) break;
         }
+        logOutside(folders, outside);
         return result;
+    }
+
+    /** Teşhis: Public Folders dışında sayılan raporların en çok görülen 10 üst klasörü ve zincirleri. */
+    private void logOutside(CmsFolderPaths folders, Map<Integer, Integer> outside) {
+        if (outside.isEmpty()) return;
+        List<Map.Entry<Integer, Integer>> list = new ArrayList<>(outside.entrySet());
+        list.sort((a, b) -> b.getValue() - a.getValue());
+        log.info("Public Folders dışında sayılan rapor: " + sum(outside) + ", farklı üst klasör: " + outside.size()
+                + ". En çok görülenler:");
+        for (int i = 0; i < Math.min(10, list.size()); i++) {
+            Map.Entry<Integer, Integer> e = list.get(i);
+            log.info("  " + e.getValue() + " rapor, SI_PARENTID=" + e.getKey() + " : " + folders.trace(e.getKey()));
+        }
+    }
+
+    private static int sum(Map<Integer, Integer> m) {
+        int s = 0;
+        for (Integer v : m.values()) s += v;
+        return s;
     }
 
     /** "/Public Folders/A" önekinin altı mı (büyük/küçük harf duyarsız, "/A" ile "/AB" karışmaz). */
