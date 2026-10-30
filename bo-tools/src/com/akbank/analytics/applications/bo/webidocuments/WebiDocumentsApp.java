@@ -35,7 +35,7 @@ import java.util.TreeMap;
  *                    [--folder "/Public Folders/AKBANK"] [--limit N] [--no-query] [--table SEMA.TABLO]
  *                    [--apply] [--force]
  *
- *   --rest     : RESTful adresi; verilmezse credentials.json system.rest, o da yoksa http://<CMS sunucusu>:6405/biprws
+ *   --rest     : RESTful adresi; verilmezse credentials.json biprwsUrl, o da yoksa http://<CMS sunucusu>:6405/biprws
  *   --folder   : sadece bu klasörün altı (test için; --apply ile kullanılamaz)
  *   --limit    : ilk N rapor (test için; --apply ile kullanılamaz)
  *   --no-query : REST'e gitmeden sadece CMS: rapor x universe satırları, QUERY alanları boş
@@ -165,7 +165,7 @@ public final class WebiDocumentsApp {
                     source = "--rest";
                 } else if (rc.restUrl != null) {
                     restUrl = WebiRestClient.normalizeBaseUrl(rc.restUrl);
-                    source = "credentials.json system.rest";
+                    source = "credentials.json " + rc.source;
                 } else {
                     restUrl = WebiRestClient.defaultBaseUrl(cms);
                     source = "varsayılan, CMS sunucusu";
