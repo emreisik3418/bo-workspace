@@ -13,6 +13,7 @@ Universe obje/tablo eşlemesiyle ilgili işler `universe-object-mapping` projesi
 | `sdk` | BoSession (garanti logoff) |
 | `common` | BoLogon: ortam seçimi (`--env`) ve yeniden denemeli logon (4 deneme, 2 dk) |
 | `keyword` | **ReportKeywordApp**: rapor Keywords alanına etiket ekler → `keyword.md` |
+| `webidocuments` | **WebiDocumentsApp**: Webi rapor × sorgu × universe envanteri → Oracle → `webidocuments.md` |
 
 `app`, `config`, `credential`, `model`, `sdk` dosyaları universe-object-mapping'deki ile **aynı**; oradan kopyalandı.
 Bir hata düzeltmesi yapılırsa iki projede de güncellenmeli.

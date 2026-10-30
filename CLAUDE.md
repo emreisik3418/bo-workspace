@@ -13,6 +13,12 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 - İşler:
   - `keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`,
     CSV yedek + doğrulama. SDK: `IInfoObject.getKeyword/setKeyword/save` (gerçek SDK'da henüz doğrulanmadı).
+  - `webidocuments` `WebiDocumentsApp`: Public Folders altındaki Webi raporlarının sorgu (data provider) + universe
+    bilgilerini `POPR.SDK_METADATA_WEBIDOCUMENTS_JOB` tablosuna yazar (satır = rapor x sorgu, SYSTEM başına delete+insert).
+    Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
+    ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);
+    REST adresi credentials.json'daki mevcut `biprwsUrl` alanından (CMS sunucusundan farklı olabilir).
+    REST hatasında CMS `SI_UNIVERSE`/`SI_DSL_UNIVERSE` yedeği. Dry-run = CSV; `--apply` = DB. Ayrıntı: `bo-tools/webidocuments.md`.
 
 ## Çalışma şekli (kullanıcı ortamı)
 - Kullanıcı bir banka iş bilgisayarında çalışıyor. GitHub'dan **indiremiyor**; dosyaları repodan elle kopyala-yapıştır yapıyor.
