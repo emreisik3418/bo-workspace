@@ -8,7 +8,7 @@ Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe 
 |---|---|
 | `WebiDocumentsApp.java` | Ana sınıf: parametreler → CMS → REST → CSV → (--apply) DB → doğrulama |
 | `CmsWebiReader.java` | CMS sorguları: klasörler, Webi raporları (sayfalı), veri kaynağı SI_ID → CUID / ad |
-| `CmsFolderPaths.java` | Klasör ID → `/Public Folders/...` yolu; Public dışı (kişisel, Inbox) için null |
+| `CmsFolderPaths.java` | Klasör ID → `/Public Folders/...` yolu; kök = SI_ID 23 ya da SI_PARENTID 0 (bu CMS'te üst klasörler 0 geliyor); Public dışı (kişisel, Inbox) için null |
 | `WebiRestClient.java` | RESTful (raylight): `/documents/{id}/dataproviders`, dokümanı kapatma, token yenileme |
 | `WebiDocumentsDao.java` | Oracle: SYSTEM başına DELETE + batch INSERT, tek transaction |
 | `WebiDocument.java`, `WebiDocumentRow.java` | Rapor ve satır modelleri |

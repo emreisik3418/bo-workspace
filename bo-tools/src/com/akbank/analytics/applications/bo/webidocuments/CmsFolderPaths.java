@@ -4,13 +4,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Klasör ID -> yol. Sadece Public Folders (kök SI_ID 23) altındaki klasörler için yol döner;
- * kişisel klasörler / Inbox gibi zinciri 23'e ulaşmayanlar için null.
+ * Klasör ID -> yol. Sadece Public Folders altındaki klasörler için yol döner;
+ * kişisel klasörler / Inbox gibi zinciri köke ulaşmayanlar için null.
+ * Kök: SI_ID 23 (Root Folder) ya da SI_PARENTID 0. Bu CMS'te üst düzey klasörlerin (ör. AKBANK)
+ * SI_PARENTID'si 23 değil 0 geliyor. Kişisel klasörlerin zinciri FavoritesFolder'da (listede yok) kesilir.
  * Yol biçimi: "/Public Folders/AKBANK/Risk" (rapor adı dahil değil).
  */
 final class CmsFolderPaths {
 
     static final int PUBLIC_ROOT_ID = 23;
+    static final int TOP_PARENT_ID = 0;
     static final String PUBLIC_ROOT_NAME = "Public Folders";
     private static final int MAX_DEPTH = 100;
 
@@ -41,7 +44,9 @@ final class CmsFolderPaths {
         Integer current = folderId;
         for (int depth = 0; depth < MAX_DEPTH && current != null; depth++) {
             if (sb.length() > 0) sb.append(" -> ");
-            if (current == PUBLIC_ROOT_ID) return sb.append(current).append("(Public)").toString();
+            if (current == PUBLIC_ROOT_ID || current == TOP_PARENT_ID) {
+                return sb.append(current).append("(Public)").toString();
+            }
             String name = names.get(current);
             if (name == null) return sb.append(current).append("(listede yok)").toString();
             sb.append(current).append('(').append(name).append(')');
@@ -54,7 +59,7 @@ final class CmsFolderPaths {
         StringBuilder sb = new StringBuilder();
         int current = folderId;
         for (int depth = 0; depth < MAX_DEPTH; depth++) {
-            if (current == PUBLIC_ROOT_ID) {
+            if (current == PUBLIC_ROOT_ID || current == TOP_PARENT_ID) {
                 return "/" + PUBLIC_ROOT_NAME + sb;
             }
             String name = names.get(current);
