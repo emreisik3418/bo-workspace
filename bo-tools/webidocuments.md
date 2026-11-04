@@ -35,9 +35,13 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
 
 ## Parametreler
 ```
-<credentials.json> [--env HOST:6400] [--rest http://HOST:6405/biprws] [--folder "/Public Folders/..."]
+<credentials.json> [--env HOST:6400 | --env all] [--rest http://HOST:6405/biprws] [--folder "/Public Folders/..."]
                    [--limit N] [--no-query] [--table SEMA.TABLO] [--apply] [--force]
 ```
+- `--env`: ortam (`system.cms` değeri). **`--env all`: credentials.json'daki tüm ortamlar sırayla**, tek JVM'de.
+  Her ortam kendi CMS oturumu, kendi `biprwsUrl`'i, kendi CSV'si (`webidocuments_<HOST_6400>_<zaman>.csv`) ve
+  kendi DB yazımıyla (`SYSTEM` = o ortam) işlenir. Bir ortam hata verirse atlanır, diğerleri devam eder;
+  sonda `Özet` bölümünde ortam başına sonuç yazar. Çıkış kodu: hepsi başarılı 0, hiçbiri işlenemedi 2, diğer 1.
 - `--rest`: RESTful adresi. Öncelik: `--rest` > `credentials.json` `biprwsUrl` > `http://<CMS sunucusu>:6405/biprws`.
   Postman'de çalışan adres aynen verilebilir: sonundaki `/logon/long` vb. atılır, `/biprws` yoksa eklenir.
   Hangi adresin kullanıldığı logda `RESTful adresi: ... (kaynak)` satırında yazar.
@@ -59,7 +63,7 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
   Tek bir yöntemi zorlamak için: `credentials.json` `restToken` ya da VM option `-Dbo.restToken=logon|serialized|rest` (VM option önceliklidir).
 
 ## Çıktılar
-- `reports\webidocuments_<zaman>.csv`: tablodaki kolonlar + `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`.
+- `reports\webidocuments_<HOST_6400>_<zaman>.csv` (ortam başına bir dosya): tablodaki kolonlar + `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`.
 - `logs\webidocuments_*.log`
 
 **Durumlar:** `QUERY` (REST'ten sorgu okundu), `NO_QUERY` (raporda sorgu yok), `CMS_ONLY` (--no-query),
@@ -98,7 +102,7 @@ Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8I
 1. `--limit 20` ile dry-run: CSV'de QUERY / DATASOURCE kolonlarını kontrol edin.
 2. `--no-query` ile tam dry-run: toplam rapor sayısını ve süreyi görün.
 3. Tam dry-run (REST'li), mesai sonrası. Log'daki "kalan tahmini" süreye bakın.
-4. Uygunsa `--apply` (mesai sonrası, `run_webidocuments.bat`).
+4. Uygunsa `--apply` (mesai sonrası): `run_webidocuments.bat --env all --apply`.
 
 ## Gerçek SDK'da doğrulanacaklar
 - `SI_OWNER`, `SI_CREATION_TIME`, `SI_UPDATE_TS` değerlerinin `properties().getProperty(...)` ile String / Date geldiği.

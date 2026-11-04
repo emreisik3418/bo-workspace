@@ -31,10 +31,11 @@ import java.util.TreeMap;
  * POPR.SDK_METADATA_WEBIDOCUMENTS_JOB tablosuna yazar. Satır = raporun bir sorgusu.
  *
  * Kullanım:
- *   WebiDocumentsApp <credentials.json> [--env HOST:6400] [--rest http://HOST:6405/biprws]
+ *   WebiDocumentsApp <credentials.json> [--env HOST:6400 | --env all] [--rest http://HOST:6405/biprws]
  *                    [--folder "/Public Folders/AKBANK"] [--limit N] [--no-query] [--table SEMA.TABLO]
  *                    [--apply] [--force]
  *
+ *   --env      : ortam (credentials.json system.cms); "all" = tüm ortamlar sırayla, biri hata verirse diğerleri devam eder
  *   --rest     : RESTful adresi; verilmezse credentials.json biprwsUrl, o da yoksa http://<CMS sunucusu>:6405/biprws
  *   --folder   : sadece bu klasörün altı (test için; --apply ile kullanılamaz)
  *   --limit    : ilk N rapor (test için; --apply ile kullanılamaz)
@@ -43,11 +44,12 @@ import java.util.TreeMap;
  *   --force    : REST hatası %10'u geçse de DB'ye yaz
  *
  * DB: aynı SYSTEM'in satırları silinir, yenileri eklenir (tek transaction). Hiç rapor okunamadıysa DB'ye dokunulmaz.
- * Çıkış kodu: 0 = başarılı, 1 = kısmi (REST hatası olan rapor var / DB'ye yazılmadı), 2 = hata.
+ * Çıkış kodu: 0 = tüm ortamlar başarılı, 1 = kısmi (REST hatası / DB'ye yazılmayan ya da hata veren ortam var),
+ *             2 = hata (hiçbir ortam işlenemedi).
  */
 public final class WebiDocumentsApp {
 
-    private static final String USAGE = "Kullanım: WebiDocumentsApp <credentials.json> [--env HOST:6400] [--rest URL]"
+    private static final String USAGE = "Kullanım: WebiDocumentsApp <credentials.json> [--env HOST:6400 | all] [--rest URL]"
             + " [--folder \"/Public Folders/...\"] [--limit N] [--no-query] [--table SEMA.TABLO] [--apply] [--force]";
 
     /** REST hatası bu oranı geçerse --force olmadan DB'ye yazılmaz. */
@@ -111,27 +113,100 @@ public final class WebiDocumentsApp {
         if (limit > 0) log.info("Limit: ilk " + limit + " rapor");
         log.info("Log: " + log.getPath());
 
-        AppConfig config = AppConfig.load(Paths.get(positional.get(0)));
-        BoEnvironment env = BoLogon.pickEnvironment(config, envArg);
-        if (env == null) {
-            log.error("Ortam seçilemedi. credentials.json'daki ortamlar: " + BoLogon.cmsList(config) + ". --env ile belirtin.");
-            return 2;
+        Opts o = new Opts();
+        o.base = base;
+        o.credentials = Paths.get(positional.get(0));
+        o.restArg = restArg;
+        o.folder = folder;
+        o.limit = limit;
+        o.apply = apply;
+        o.force = force;
+        o.noQuery = noQuery;
+        o.table = table;
+        o.dao = dao;
+        o.exportDate = exportDate;
+        o.stamp = stamp;
+        o.config = AppConfig.load(o.credentials);
+
+        // ---- Ortamlar: --env all -> hepsi sırayla; --env HOST:6400 -> o; verilmezse tek ortam varsa o
+        List<BoEnvironment> envs = new ArrayList<>();
+        if ("all".equalsIgnoreCase(envArg == null ? "" : envArg.trim())) {
+            envs.addAll(o.config.getEnvironments());
+        } else {
+            BoEnvironment env = BoLogon.pickEnvironment(o.config, envArg);
+            if (env == null) {
+                log.error("Ortam seçilemedi. credentials.json'daki ortamlar: " + BoLogon.cmsList(o.config)
+                        + ". --env HOST:6400 ya da hepsi için --env all verin.");
+                return 2;
+            }
+            envs.add(env);
         }
+        log.info("Ortamlar (" + envs.size() + "): " + envs);
+
+        o.sbox = new SboxCredentialProvider(
+                o.config.getSboxEndpoint(), o.config.getSboxUsername(), o.config.getSboxPassword());
+        if (apply) {
+            o.dbCredential = o.sbox.get(o.config.getDbTarget());
+        }
+
+        // ---- Ortam ortam: biri hata verirse diğerleri devam eder
+        Map<String, Integer> results = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < envs.size(); i++) {
+            BoEnvironment env = envs.get(i);
+            log.info("========== Ortam " + (i + 1) + "/" + envs.size() + ": " + env.getCms() + " ==========");
+            int code;
+            try {
+                code = runEnv(o, env, log);
+            } catch (Throwable t) {
+                log.error("[" + env.getCms() + "] ortam işlenemedi, sonraki ortama geçiliyor", t);
+                code = 2;
+            }
+            results.put(env.getCms(), code);
+            log.info("[" + env.getCms() + "] bitti, sonuç: " + describeCode(code));
+        }
+
+        log.info("========== Özet ==========");
+        int ok = 0, failed = 0;
+        for (Map.Entry<String, Integer> e : results.entrySet()) {
+            log.info("  " + e.getKey() + " : " + describeCode(e.getValue()));
+            if (e.getValue() == 0) ok++;
+            if (e.getValue() == 2) failed++;
+        }
+        if (ok == results.size()) return 0;
+        if (failed == results.size()) return 2;
+        return 1;
+    }
+
+    static String describeCode(int code) {
+        return code == 0 ? "BASARILI (0)" : code == 1 ? "KISMI (1)" : "HATA (2)";
+    }
+
+    /** Ortamlar arasında ortak ayarlar. */
+    private static final class Opts {
+        Path base, credentials;
+        String restArg, folder, table, stamp;
+        int limit;
+        boolean apply, force, noQuery;
+        WebiDocumentsDao dao;
+        Date exportDate;
+        AppConfig config;
+        SboxCredentialProvider sbox;
+        Credential dbCredential;
+    }
+
+    /** Tek bir ortam: CMS -> REST -> CSV -> (--apply) DB. Çıkış kodu kuralları main ile aynı. */
+    private static int runEnv(Opts o, BoEnvironment env, RunLog log) throws Exception {
         String cms = env.getCms();
-        SboxCredentialProvider sbox = new SboxCredentialProvider(
-                config.getSboxEndpoint(), config.getSboxUsername(), config.getSboxPassword());
-        Credential boCredential = sbox.get(env.getSbox());
+        Credential boCredential = o.sbox.get(env.getSbox());
 
         // --apply: DB'ye uzun işten ÖNCE bir kez bağlanıp tabloyu kontrol et (saatler sonra hata almayalım)
-        Credential dbCredential = null;
         int before = -1;
-        if (apply) {
-            dbCredential = sbox.get(config.getDbTarget());
-            try (Connection c = DriverManager.getConnection(config.getDbJdbcUrl(),
-                    dbCredential.getUsername(), dbCredential.getPassword())) {
-                before = dao.count(c, cms);
+        if (o.apply) {
+            try (Connection c = DriverManager.getConnection(o.config.getDbJdbcUrl(),
+                    o.dbCredential.getUsername(), o.dbCredential.getPassword())) {
+                before = o.dao.count(c, cms);
             }
-            log.info("DB bağlantısı tamam. " + table + " içinde SYSTEM=" + cms + " için mevcut satır: " + before);
+            log.info("DB bağlantısı tamam. " + o.table + " içinde SYSTEM=" + cms + " için mevcut satır: " + before);
         }
 
         List<WebiDocumentRow> rows = new ArrayList<>();
@@ -144,8 +219,8 @@ public final class WebiDocumentsApp {
             // ---- 1) Klasörler + raporlar
             CmsFolderPaths folders = reader.loadFolders();
             log.info("Klasör sayısı: " + folders.size());
-            List<WebiDocument> docs = reader.listDocuments(folders, folder);
-            if (limit > 0 && docs.size() > limit) docs = new ArrayList<>(docs.subList(0, limit));
+            List<WebiDocument> docs = reader.listDocuments(folders, o.folder);
+            if (o.limit > 0 && docs.size() > o.limit) docs = new ArrayList<>(docs.subList(0, o.limit));
             docCount = docs.size();
             log.info("İşlenecek Webi raporu: " + docCount);
             if (docs.isEmpty()) {
@@ -156,12 +231,12 @@ public final class WebiDocumentsApp {
             // ---- 2) Sorgular (REST)
             WebiRestClient rest = null;
             String restMode = null;
-            if (!noQuery) {
-                RestEndpointConfig rc = RestEndpointConfig.read(Paths.get(positional.get(0)), cms);
+            if (!o.noQuery) {
+                RestEndpointConfig rc = RestEndpointConfig.read(o.credentials, cms);
                 String restUrl;
                 String source;
-                if (restArg != null) {
-                    restUrl = WebiRestClient.normalizeBaseUrl(restArg);
+                if (o.restArg != null) {
+                    restUrl = WebiRestClient.normalizeBaseUrl(o.restArg);
                     source = "--rest";
                 } else if (rc.restUrl != null) {
                     restUrl = WebiRestClient.normalizeBaseUrl(rc.restUrl);
@@ -242,27 +317,27 @@ public final class WebiDocumentsApp {
         // ---- 4) ROW_ID + CSV
         long n = 0;
         for (WebiDocumentRow r : rows) r.rowId = ++n;
-        Path csv = base.resolve("reports").resolve("webidocuments_" + stamp + ".csv");
-        writeCsv(csv, rows, cms, exportDate);
+        Path csv = o.base.resolve("reports").resolve("webidocuments_" + fileSafe(cms) + "_" + o.stamp + ".csv");
+        writeCsv(csv, rows, cms, o.exportDate);
         logCounts(rows, log);
         log.info("Rapor: " + docCount + ", satır: " + rows.size() + ", REST hatası: " + restFailed);
         log.info("CSV: " + csv);
 
-        if (!apply) {
+        if (!o.apply) {
             log.info("DRY-RUN bitti. CSV'yi kontrol edin; uygunsa --apply ile çalıştırın (mesai sonrası).");
             return restFailed > 0 ? 1 : 0;
         }
 
         // ---- 5) DB
-        if (!noQuery && restFailed > docCount * MAX_REST_FAIL_RATIO && !force) {
+        if (!o.noQuery && restFailed > docCount * MAX_REST_FAIL_RATIO && !o.force) {
             log.error(String.format("REST hatası çok fazla (%d/%d). DB'ye yazılmadı. Logu inceleyin; yine de yazmak için --force.",
                     restFailed, docCount));
             return 1;
         }
-        try (Connection c = DriverManager.getConnection(config.getDbJdbcUrl(),
-                dbCredential.getUsername(), dbCredential.getPassword())) {
-            int[] res = dao.replace(c, cms, exportDate, rows);
-            int after = dao.count(c, cms);
+        try (Connection c = DriverManager.getConnection(o.config.getDbJdbcUrl(),
+                o.dbCredential.getUsername(), o.dbCredential.getPassword())) {
+            int[] res = o.dao.replace(c, cms, o.exportDate, rows);
+            int after = o.dao.count(c, cms);
             log.info("DB: silinen " + res[0] + " (önceki sayım " + before + "), eklenen " + res[1] + ", şimdi " + after);
             if (after != rows.size()) {
                 log.error("Doğrulama başarısız: beklenen " + rows.size() + " satır, tabloda " + after);
@@ -271,6 +346,11 @@ public final class WebiDocumentsApp {
         }
         log.info("Bitti.");
         return restFailed > 0 ? 1 : 0;
+    }
+
+    /** "HOST:6400" -> "HOST_6400" (dosya adı için). */
+    static String fileSafe(String s) {
+        return s.replaceAll("[^A-Za-z0-9._-]", "_");
     }
 
     /**

@@ -18,6 +18,7 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
     Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
     ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);
     REST adresi credentials.json'daki mevcut `biprwsUrl` alanından (CMS sunucusundan farklı olabilir).
+    `--env all`: tüm ortamlar tek çalıştırmada sırayla (ortam başına oturum/CSV/DB; hata veren ortam atlanır, sonda özet).
     REST hatasında CMS `SI_UNIVERSE`/`SI_DSL_UNIVERSE` yedeği. Dry-run = CSV; `--apply` = DB. Ayrıntı: `bo-tools/webidocuments.md`.
 
 ## Çalışma şekli (kullanıcı ortamı)

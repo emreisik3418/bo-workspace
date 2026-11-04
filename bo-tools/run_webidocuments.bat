@@ -2,9 +2,11 @@
 rem Public Folders altindaki Webi raporlarinin sorgu ve universe bilgilerini
 rem POPR.SDK_METADATA_WEBIDOCUMENTS_JOB tablosuna yazar.
 rem Kullanim:
-rem   run_webidocuments.bat [--env HOST:6400] [--rest URL] [--no-query] [--apply] [--force]
+rem   run_webidocuments.bat --env all [--no-query] [--apply] [--force]
+rem   run_webidocuments.bat --env HOST:6400 [--rest URL] [--no-query] [--apply] [--force]
+rem --env all: credentials.json'daki tum ortamlar sirayla; biri hata verirse digerleri devam eder.
 rem --apply verilmezse DRY-RUN: DB'ye yazilmaz, sadece reports\ altina CSV yazilir.
-rem Cikis kodu: 0 basarili, 1 kismi (REST hatasi olan rapor var / DB'ye yazilmadi), 2 hata.
+rem Cikis kodu: 0 tum ortamlar basarili, 1 kismi, 2 hicbir ortam islenemedi.
 setlocal
 set BO=C:\Program Files (x86)\SAP BusinessObjects\SAP BusinessObjects Enterprise XI 4.0
 set APP=C:\batchs\BusinessObjects\BOTOOLS
