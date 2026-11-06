@@ -25,11 +25,18 @@ final class SyncPlan {
         final Date updatedTime;
         final int rows;
         final int emptyQueryRows;
+        /** DB'deki tarih okunamadı (metin kolon, bilinmeyen biçim): rapor yeniden yazılsın. */
+        final boolean forceRefresh;
 
         DbState(Date updatedTime, int rows, int emptyQueryRows) {
+            this(updatedTime, rows, emptyQueryRows, false);
+        }
+
+        DbState(Date updatedTime, int rows, int emptyQueryRows, boolean forceRefresh) {
             this.updatedTime = updatedTime;
             this.rows = rows;
             this.emptyQueryRows = emptyQueryRows;
+            this.forceRefresh = forceRefresh;
         }
     }
 
@@ -49,7 +56,7 @@ final class SyncPlan {
             DbState s = existing.get(d.cuid);
             Action a;
             if (s == null) a = Action.NEW;
-            else if (!sameSecond(s.updatedTime, d.updatedTime)) a = Action.CHANGED;
+            else if (s.forceRefresh || !sameSecond(s.updatedTime, d.updatedTime)) a = Action.CHANGED;
             else if (full || s.emptyQueryRows > 0) a = Action.RETRY;
             else a = Action.UNCHANGED;
             p.actions.put(d, a);

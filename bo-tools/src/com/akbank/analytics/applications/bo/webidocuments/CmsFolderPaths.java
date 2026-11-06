@@ -8,7 +8,7 @@ import java.util.Map;
  * kişisel klasörler / Inbox gibi zinciri köke ulaşmayanlar için null.
  * Kök: SI_ID 23 (Root Folder) ya da SI_PARENTID 0. Bu CMS'te üst düzey klasörlerin (ör. AKBANK)
  * SI_PARENTID'si 23 değil 0 geliyor. Kişisel klasörlerin zinciri FavoritesFolder'da (listede yok) kesilir.
- * Yol biçimi: "/Public Folders/AKBANK/Risk" (rapor adı dahil değil).
+ * Yol biçimi: "Public Folders/AKBANK/Risk" (eski uygulamayla aynı, başta "/" yok) (rapor adı dahil değil).
  */
 final class CmsFolderPaths {
 
@@ -60,7 +60,7 @@ final class CmsFolderPaths {
         int current = folderId;
         for (int depth = 0; depth < MAX_DEPTH; depth++) {
             if (current == PUBLIC_ROOT_ID || current == TOP_PARENT_ID) {
-                return "/" + PUBLIC_ROOT_NAME + sb;
+                return PUBLIC_ROOT_NAME + sb;
             }
             String name = names.get(current);
             if (name == null) return null;   // zincir Public Folders'a ulaşmadı

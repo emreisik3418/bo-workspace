@@ -35,6 +35,7 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
 | `WebiDocumentsDao.java` | Oracle: mevcut durum, rapor başına sil + yaz (COMMIT), silinen raporlar |
 | `SyncPlan.java` | Günlük plan: NEW / CHANGED / RETRY / UNCHANGED / silinecek |
 | `CsvOut.java` | Rapor rapor yazılan CSV |
+| `DateText.java` | Metin tipindeki tarih kolonlarını okuma / yazma |
 | `WebiDocument.java`, `WebiDocumentRow.java` | Rapor ve satır modelleri |
 
 **Main class:** `com.akbank.analytics.applications.bo.webidocuments.WebiDocumentsApp`
@@ -46,7 +47,7 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
 | CUID, NAME, DESCRIPTION, KEYWORD | `CI_INFOOBJECTS` `SI_KIND='Webi'`, `SI_INSTANCE=0` |
 | OWNER | `SI_OWNER` |
 | CREATION_TIME / UPDATED_TIME | `SI_CREATION_TIME` / `SI_UPDATE_TS` |
-| PATH | Klasör yolu, rapor adı hariç: `/Public Folders/AKBANK/Risk` |
+| PATH | Klasör yolu, rapor adı hariç, başta `/` yok (eski uygulamayla aynı): `Public Folders/AKBANK/Risk` |
 | QUERY_ID, QUERY_NAME | REST `GET /raylight/v1/documents/{SI_ID}/dataproviders` → `id` (DP0), `name` |
 | DATASOURCE_CUID, DATASOURCE_NAME | Sorgunun `dataSourceId` (SI_ID) → CMS'te `CI_APPOBJECTS`, yoksa `CI_INFOOBJECTS` |
 | SYSTEM | CMS (`HOST:6400`) |
@@ -103,6 +104,10 @@ DB'deki satırlar korundu), `DELETED` / `DELETE` (dry-run) / `DELETE_SKIPPED` (s
 - Rapor başına: `DELETE ... WHERE SYSTEM = ? AND CUID = ?` + INSERT, hemen COMMIT; hata olursa sadece o rapor rollback.
 - DB bağlantısı koparsa bir kez yeniden bağlanıp tekrar denenir.
 - Hiç rapor bulunamadıysa DB'ye dokunulmaz.
+- **Kolon tipleri otomatik tespit edilir** (log: `DB kolon tipleri: ...`). Eski uygulamanın tablosunda tarih / ROW_ID
+  kolonları metin (VARCHAR2) olabilir: o zaman metin olarak okunur, **mevcut veride en sık görülen biçimde** yazılır
+  (log: `örnek UPDATED_TIME = "...", yazma biçimi: ...`). Biçimi zorlamak için VM option `-Dbo.dateFormat="dd.MM.yyyy HH:mm:ss"`.
+  Okunamayan tarihli raporlar yeniden yazılır (kendiliğinden düzelir); logda örnek değer yazar.
 - Uzun metinler kolon boyuna kırpılır (`WebiDocumentsDao.LEN_*`); tablo farklı boyutlardaysa sabitleri güncelleyin.
 
 Önerilen DDL (tablo zaten varsa kolon boylarını karşılaştırın):

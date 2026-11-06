@@ -21,6 +21,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
     ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);
     REST adresi credentials.json'daki mevcut `biprwsUrl` alanından (CMS sunucusundan farklı olabilir).
     `--env all`: tüm ortamlar tek çalıştırmada sırayla (ortam başına oturum/CSV/DB; hata veren ortam atlanır, sonda özet).
+    Mevcut tabloda tarih kolonları METİN (VARCHAR2) çıktı (getTimestamp → "Timestamp format must be yyyy-mm-dd"):
+    kolon tipleri ResultSetMetaData ile tespit edilir, metin tarih `DateText` ile okunur/mevcut biçimde yazılır. PATH başta `/` olmadan.
     REST hatasında CMS `SI_UNIVERSE`/`SI_DSL_UNIVERSE` yedeği. Dry-run = CSV; `--apply` = DB. Ayrıntı: `bo-tools/webidocuments.md`.
 
 ## Çalışma şekli (kullanıcı ortamı)

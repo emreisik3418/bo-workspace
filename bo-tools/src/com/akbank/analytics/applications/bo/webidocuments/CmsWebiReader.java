@@ -130,10 +130,17 @@ final class CmsWebiReader {
 
     /** "/Public Folders/A" önekinin altı mı (büyük/küçük harf duyarsız, "/A" ile "/AB" karışmaz). */
     static boolean underFolder(String path, String prefix) {
-        String p = path.toLowerCase();
-        String f = prefix.toLowerCase();
-        while (f.endsWith("/")) f = f.substring(0, f.length() - 1);
+        String p = trimSlashes(path.toLowerCase());
+        String f = trimSlashes(prefix.toLowerCase());
         return p.equals(f) || p.startsWith(f + "/");
+    }
+
+    /** Baştaki / sondaki "/" atılır: "/Public Folders/A/" ile "Public Folders/A" aynı sayılır. */
+    private static String trimSlashes(String s) {
+        String r = s.trim();
+        while (r.startsWith("/")) r = r.substring(1);
+        while (r.endsWith("/")) r = r.substring(0, r.length() - 1);
+        return r;
     }
 
     /** Veri kaynağı SI_ID'leri -> {CUID, ad, tür}. Önce CI_APPOBJECTS (universe'ler), kalanlar CI_INFOOBJECTS. */

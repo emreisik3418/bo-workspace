@@ -218,9 +218,22 @@ public final class WebiDocumentsApp {
             long rowId = 0;
             if (db != null) {
                 try {
-                    existing = o.dao.loadState(db.get(), cms);
-                    rowId = o.dao.maxRowId(db.get(), cms);
-                    log.info("DB: " + o.table + " içinde SYSTEM=" + cms + " için mevcut rapor: " + existing.size());
+                    log.info("DB kolon tipleri: " + o.dao.detectColumns(db.get()));
+                    WebiDocumentsDao.LoadInfo info = new WebiDocumentsDao.LoadInfo();
+                    existing = o.dao.loadState(db.get(), cms, info);
+                    rowId = info.maxRowId;
+                    String forcedPattern = System.getProperty("bo.dateFormat");
+                    if (forcedPattern != null) o.dao.setDatePattern(forcedPattern.trim());
+                    log.info("DB: " + o.table + " içinde SYSTEM=" + cms + " için mevcut rapor: " + existing.size()
+                            + " (" + info.rows + " satır), en büyük ROW_ID: " + info.maxRowId);
+                    if (o.dao.isChar("UPDATED_TIME")) {
+                        log.info("Tarih kolonları metin: örnek UPDATED_TIME = \"" + info.sampleDate + "\", yazma biçimi: "
+                                + o.dao.getDatePattern() + (forcedPattern != null ? " (-Dbo.dateFormat)" : ""));
+                    }
+                    if (info.unparsedDates > 0) {
+                        log.warn(info.unparsedDates + " satırda UPDATED_TIME okunamadı (örnek: \"" + info.unparsedSample
+                                + "\"); bu raporlar yeniden yazılacak. Biçim bildirilirse eklenebilir.");
+                    }
                 } catch (SQLException e) {
                     if (o.apply) throw e;
                     log.warn("DB okunamadı, dry-run'da tüm raporlar yeni sayılacak: " + RunLog.describe(e));

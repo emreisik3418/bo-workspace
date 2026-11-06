@@ -3,21 +3,26 @@ package com.akbank.analytics.applications.bo.webidocuments;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Oracle yazımı, rapor bazında (günlük artımlı çalışma için):
+ *   - detectColumns  : kolon tipleri (eski tabloda tarih / ROW_ID kolonları metin olabilir; ona göre okunur / yazılır)
  *   - loadState      : SYSTEM'in raporları (CUID -> UPDATED_TIME, satır sayısı, sorgusu boş satır sayısı)
  *   - replaceDocument: bir raporun satırlarını sil + yenilerini ekle, hemen COMMIT (iş yarıda kesilse de yazılanlar kalır)
  *   - deleteDocuments: CMS'te artık olmayan raporların satırlarını sil
  * Not: SQL metninde Türkçe karakter OLMAMALI (DB karakter seti WE8ISO8859P9, orai18n.jar yok).
- * Değerler bind ile yazılır; okunan kolonlar CUID (ASCII), tarih ve sayı — sırayla (1, 2, 3) okunur.
+ * Değerler bind ile yazılır; okunan kolonlar CUID, UPDATED_TIME, QUERY_ID, ROW_ID (ASCII) — sırayla okunur.
  */
 final class WebiDocumentsDao {
 
@@ -47,36 +52,123 @@ final class WebiDocumentsDao {
         }
     }
 
-    /** CUID -> {UPDATED_TIME, satır sayısı, QUERY_ID boş satır sayısı}. */
-    Map<String, SyncPlan.DbState> loadState(Connection c, String system) throws SQLException {
-        Map<String, SyncPlan.DbState> m = new HashMap<>();
-        String sql = "SELECT CUID, MAX(UPDATED_TIME), COUNT(*), SUM(CASE WHEN QUERY_ID IS NULL THEN 1 ELSE 0 END)"
-                + " FROM " + table + " WHERE SYSTEM = ? GROUP BY CUID";
+    /** Metin tipindeki kolonlar (büyük harf). detectColumns ile dolar. */
+    private final Set<String> charColumns = new HashSet<>();
+    /** Metin tarih kolonlarına yazarken kullanılan biçim (mevcut veriden tespit edilir). */
+    private String datePattern = DateText.DEFAULT_PATTERN;
+
+    /** loadState sonucu hakkında bilgi (log için). */
+    static final class LoadInfo {
+        long maxRowId;
+        int rows;
+        int unparsedDates;
+        String sampleDate;      // UPDATED_TIME'dan örnek ham değer
+        String unparsedSample;  // okunamayan bir örnek
+    }
+
+    /** Tablonun kolon tiplerini okur (tarih / ROW_ID kolonları metin olabilir). Dönen: log için özet. */
+    String detectColumns(Connection c) throws SQLException {
+        charColumns.clear();
+        StringBuilder sb = new StringBuilder();
+        try (PreparedStatement ps = c.prepareStatement("SELECT * FROM " + table + " WHERE 1 = 0");
+             ResultSet rs = ps.executeQuery()) {
+            ResultSetMetaData md = rs.getMetaData();
+            for (int i = 1; i <= md.getColumnCount(); i++) {
+                String name = md.getColumnName(i).toUpperCase(Locale.ROOT);
+                int t = md.getColumnType(i);
+                boolean isChar = t == Types.CHAR || t == Types.VARCHAR || t == Types.NCHAR || t == Types.NVARCHAR
+                        || t == Types.LONGVARCHAR || t == Types.LONGNVARCHAR || t == Types.CLOB || t == Types.NCLOB;
+                if (isChar) charColumns.add(name);
+                if (name.equals("ROW_ID") || name.endsWith("_TIME") || name.endsWith("_DATE")) {
+                    if (sb.length() > 0) sb.append(", ");
+                    sb.append(name).append('=').append(md.getColumnTypeName(i));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    boolean isChar(String column) { return charColumns.contains(column); }
+
+    String getDatePattern() { return datePattern; }
+
+    void setDatePattern(String p) { datePattern = p; }
+
+    /**
+     * CUID -> {en büyük UPDATED_TIME, satır sayısı, QUERY_ID boş satır sayısı}. Satır satır okunup Java'da toplanır
+     * (UPDATED_TIME metin olabilir: MAX metinde yanlış sonuç verir). Metin tarih okunamazsa rapor yeniden yazılır.
+     * Metin tarih kolonları için yazma biçimi mevcut veride en sık görülen biçim olarak ayarlanır.
+     */
+    Map<String, SyncPlan.DbState> loadState(Connection c, String system, LoadInfo info) throws SQLException {
+        boolean updatedIsChar = isChar("UPDATED_TIME");
+        Map<String, Date> maxDate = new HashMap<>();
+        Map<String, int[]> counts = new HashMap<>();   // {satır, sorgusu boş, okunamayan tarih}
+        Map<String, Integer> patterns = new HashMap<>();
+        String sql = "SELECT CUID, UPDATED_TIME, QUERY_ID, ROW_ID FROM " + table + " WHERE SYSTEM = ?";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
             ps.setString(1, system);
             ps.setFetchSize(5000);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     String cuid = rs.getString(1);
-                    Timestamp t = rs.getTimestamp(2);
-                    if (cuid != null) {
-                        m.put(cuid, new SyncPlan.DbState(t == null ? null : new Date(t.getTime()), rs.getInt(3), rs.getInt(4)));
+                    Date updated;
+                    boolean unparsed = false;
+                    if (updatedIsChar) {
+                        String raw = rs.getString(2);
+                        if (info.sampleDate == null && raw != null && !raw.trim().isEmpty()) info.sampleDate = raw;
+                        String p = DateText.patternOf(raw);
+                        if (p != null) {
+                            Integer n = patterns.get(p);
+                            patterns.put(p, n == null ? 1 : n + 1);
+                        }
+                        updated = DateText.parse(raw);
+                        if (updated == null && raw != null && !raw.trim().isEmpty()) {
+                            unparsed = true;
+                            info.unparsedDates++;
+                            if (info.unparsedSample == null) info.unparsedSample = raw;
+                        }
+                    } else {
+                        Timestamp t = rs.getTimestamp(2);
+                        updated = t == null ? null : new Date(t.getTime());
                     }
+                    String queryId = rs.getString(3);
+                    String rowId = rs.getString(4);
+                    info.rows++;
+                    if (rowId != null) {
+                        try {
+                            info.maxRowId = Math.max(info.maxRowId, new java.math.BigDecimal(rowId.trim()).longValue());
+                        } catch (NumberFormatException ignore) {
+                            // sayısal olmayan ROW_ID: yok say
+                        }
+                    }
+                    if (cuid == null) continue;
+                    int[] k = counts.get(cuid);
+                    if (k == null) counts.put(cuid, k = new int[3]);
+                    k[0]++;
+                    if (queryId == null) k[1]++;
+                    if (unparsed) k[2]++;
+                    Date m = maxDate.get(cuid);
+                    if (updated != null && (m == null || updated.after(m))) maxDate.put(cuid, updated);
                 }
             }
         }
-        return m;
-    }
-
-    /** SYSTEM'deki en büyük ROW_ID (yeni satırlar bunun üstünden numaralanır). */
-    long maxRowId(Connection c, String system) throws SQLException {
-        try (PreparedStatement ps = c.prepareStatement("SELECT NVL(MAX(ROW_ID), 0) FROM " + table + " WHERE SYSTEM = ?")) {
-            ps.setString(1, system);
-            try (ResultSet rs = ps.executeQuery()) {
-                rs.next();
-                return rs.getLong(1);
+        // Yazma biçimi: mevcut veride en sık görülen
+        String best = null;
+        int bestN = 0;
+        for (Map.Entry<String, Integer> e : patterns.entrySet()) {
+            if (e.getValue() > bestN) {
+                best = e.getKey();
+                bestN = e.getValue();
             }
         }
+        if (best != null) datePattern = best;
+
+        Map<String, SyncPlan.DbState> m = new HashMap<>();
+        for (Map.Entry<String, int[]> e : counts.entrySet()) {
+            int[] k = e.getValue();
+            m.put(e.getKey(), new SyncPlan.DbState(maxDate.get(e.getKey()), k[0], k[1], k[2] > 0));
+        }
+        return m;
     }
 
     /** Bir raporun satırlarını değiştirir ve COMMIT eder. Dönen: {silinen, eklenen}. Hata olursa rollback. */
@@ -94,22 +186,22 @@ final class WebiDocumentsDao {
             String sql = "INSERT INTO " + table + " (ROW_ID, SYSTEM, EXPORT_DATE, CUID, OWNER, NAME, PATH, DESCRIPTION,"
                     + " KEYWORD, CREATION_TIME, UPDATED_TIME, QUERY_ID, QUERY_NAME, DATASOURCE_CUID, DATASOURCE_NAME)"
                     + " VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)";
-            Timestamp export = new Timestamp(exportDate.getTime());
             try (PreparedStatement ins = c.prepareStatement(sql)) {
                 for (WebiDocumentRow r : rows) {
                     WebiDocument d = r.doc;
                     int i = 1;
-                    ins.setLong(i++, r.rowId);
+                    if (isChar("ROW_ID")) ins.setString(i++, String.valueOf(r.rowId));
+                    else ins.setLong(i++, r.rowId);
                     ins.setString(i++, cut(system, LEN_SYSTEM));
-                    ins.setTimestamp(i++, export);
+                    setDate(ins, i++, exportDate, "EXPORT_DATE");
                     ins.setString(i++, cut(d.cuid, LEN_CUID));
                     ins.setString(i++, cut(d.owner, LEN_OWNER));
                     ins.setString(i++, cut(d.name, LEN_NAME));
                     ins.setString(i++, cut(d.path, LEN_PATH));
                     ins.setString(i++, cut(d.description, LEN_DESCRIPTION));
                     ins.setString(i++, cut(d.keyword, LEN_KEYWORD));
-                    setDate(ins, i++, d.creationTime);
-                    setDate(ins, i++, d.updatedTime);
+                    setDate(ins, i++, d.creationTime, "CREATION_TIME");
+                    setDate(ins, i++, d.updatedTime, "UPDATED_TIME");
                     ins.setString(i++, cut(r.queryId, LEN_QUERY_ID));
                     ins.setString(i++, cut(r.queryName, LEN_QUERY_NAME));
                     ins.setString(i++, cut(r.dataSourceCuid, LEN_DS_CUID));
@@ -165,9 +257,15 @@ final class WebiDocumentsDao {
         return s;
     }
 
-    private static void setDate(PreparedStatement ps, int i, Date d) throws SQLException {
-        if (d == null) ps.setNull(i, Types.TIMESTAMP);
-        else ps.setTimestamp(i, new Timestamp(d.getTime()));
+    /** Kolon metinse mevcut biçimde metin, değilse TIMESTAMP yazar. */
+    private void setDate(PreparedStatement ps, int i, Date d, String column) throws SQLException {
+        if (isChar(column)) {
+            if (d == null) ps.setNull(i, Types.VARCHAR);
+            else ps.setString(i, DateText.format(d, datePattern));
+        } else {
+            if (d == null) ps.setNull(i, Types.TIMESTAMP);
+            else ps.setTimestamp(i, new Timestamp(d.getTime()));
+        }
     }
 
     /** null/boş -> null; uzunsa kırp. */
