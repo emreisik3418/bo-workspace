@@ -2,6 +2,27 @@
 
 Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe bilgilerini
 `POPR.SDK_METADATA_WEBIDOCUMENTS_JOB` tablosuna yazar. **Bir satır = bir raporun bir sorgusu.**
+Günlük çalışacak şekilde **artımlıdır** (bkz. "Günlük çalışma").
+
+## Günlük çalışma (artımlı)
+Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS listesiyle karşılaştırılır:
+
+| Durum | Ne olur |
+|---|---|
+| `NEW`: DB'de yok | REST'ten sorgular okunur, yazılır |
+| `CHANGED`: `UPDATED_TIME` farklı | Raporun eski satırları silinir, yenileri yazılır |
+| `RETRY`: DB'de sorgusu boş satırı var | Tekrar denenir (önceki REST hatası, `--no-query`, sorgusuz rapor) |
+| `UNCHANGED`: aynı | **Dokunulmaz, REST'e gidilmez** (günlük çalışmayı hızlandıran kısım) |
+| CMS listesinde yok | DB'den silinir (`DELETED`); sadece liste tam okunduysa |
+
+- **Her rapor işlenir işlenmez DB'ye yazılır** (rapor başına COMMIT) ve **hemen sunucuda kapatılır** (hata olsa da).
+  İş yarıda kesilirse o ana kadar yazılanlar kalır; ertesi çalıştırma onları `UNCHANGED` sayar, kalanlardan devam eder.
+- REST hatası: **yeni** rapor CMS universe bilgisiyle yazılır (QUERY boş → ertesi gün `RETRY`);
+  **DB'de olan** rapora dokunulmaz, eski satırlar korunur (`SKIPPED`), ertesi gün tekrar denenir.
+- Korumalar: art arda 20 raporda REST hatası (sunucu düşmüş olabilir) ya da 5 raporda DB hatası → ortam durur,
+  silme yapılmaz. Silinecek rapor mevcutların %10'unu geçerse (≥100 raporda) silinmez → `DELETE_SKIPPED`, `--force` gerekir.
+- İlk çalıştırma: tablo boşsa tüm raporlar `NEW` (uzun sürer, mesai sonrası). Sonraki günler sadece fark işlenir.
+- Eski (tam silip yazan) sürümle dolmuş tablo olduğu gibi kullanılabilir.
 
 ## Dosyalar (`src/com/akbank/analytics/applications/bo/webidocuments/`)
 | Dosya | İçerik |
@@ -11,7 +32,9 @@ Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe 
 | `CmsFolderPaths.java` | Klasör ID → `/Public Folders/...` yolu; kök = SI_ID 23 ya da SI_PARENTID 0 (bu CMS'te üst klasörler 0 geliyor); Public dışı (kişisel, Inbox) için null |
 | `RestEndpointConfig.java` | credentials.json'dan `biprwsUrl` / `restToken` |
 | `WebiRestClient.java` | RESTful (raylight): `/documents/{id}/dataproviders`, dokümanı kapatma, token yenileme |
-| `WebiDocumentsDao.java` | Oracle: SYSTEM başına DELETE + batch INSERT, tek transaction |
+| `WebiDocumentsDao.java` | Oracle: mevcut durum, rapor başına sil + yaz (COMMIT), silinen raporlar |
+| `SyncPlan.java` | Günlük plan: NEW / CHANGED / RETRY / UNCHANGED / silinecek |
+| `CsvOut.java` | Rapor rapor yazılan CSV |
 | `WebiDocument.java`, `WebiDocumentRow.java` | Rapor ve satır modelleri |
 
 **Main class:** `com.akbank.analytics.applications.bo.webidocuments.WebiDocumentsApp`
@@ -27,16 +50,16 @@ Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe 
 | QUERY_ID, QUERY_NAME | REST `GET /raylight/v1/documents/{SI_ID}/dataproviders` → `id` (DP0), `name` |
 | DATASOURCE_CUID, DATASOURCE_NAME | Sorgunun `dataSourceId` (SI_ID) → CMS'te `CI_APPOBJECTS`, yoksa `CI_INFOOBJECTS` |
 | SYSTEM | CMS (`HOST:6400`) |
-| EXPORT_DATE | Çalıştırma başlangıç zamanı (tüm satırlarda aynı) |
-| ROW_ID | Çalıştırma içindeki sıra numarası (1..n), primary key değil |
+| EXPORT_DATE | Raporun **en son yazıldığı** çalıştırmanın zamanı (değişmeyen raporlarda eski tarih kalır) |
+| ROW_ID | Sıra numarası; her yazımda SYSTEM'deki en büyük ROW_ID'nin üstünden devam eder, primary key değil |
 
-REST bir raporu okuyamazsa rapor atlanmaz: CMS'teki `SI_UNIVERSE` (UNV) + `SI_DSL_UNIVERSE` (UNX) ile
+REST yeni bir raporu okuyamazsa rapor atlanmaz: CMS'teki `SI_UNIVERSE` (UNV) + `SI_DSL_UNIVERSE` (UNX) ile
 universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / universe'ü olmayan rapor da tek satır olarak yazılır.
 
 ## Parametreler
 ```
 <credentials.json> [--env HOST:6400 | --env all] [--rest http://HOST:6405/biprws] [--folder "/Public Folders/..."]
-                   [--limit N] [--no-query] [--table SEMA.TABLO] [--apply] [--force]
+                   [--limit N] [--no-query] [--full] [--table SEMA.TABLO] [--apply] [--force]
 ```
 - `--env`: ortam (`system.cms` değeri). **`--env all`: credentials.json'daki tüm ortamlar sırayla**, tek JVM'de.
   Her ortam kendi CMS oturumu, kendi `biprwsUrl`'i, kendi CSV'si (`webidocuments_<HOST_6400>_<zaman>.csv`) ve
@@ -51,11 +74,12 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
   "system": { "cms": "BO-SUNUCU:6400", "biprwsUrl": "https://REST-SUNUCU:6405/biprws", "restToken": "rest" }
   ```
   `restToken` verilirse sadece o yöntem kullanılır (çalışmayan yöntemler boşuna denenmez).
-- `--folder`, `--limit`: test için. **`--apply` ile kullanılamaz** (SYSTEM'in tüm satırları silinip bir kısmı yazılırdı).
+- `--folder`, `--limit`: test için. `--apply` ile kullanılabilir (sadece o raporlar yazılır); liste eksik olduğu için **silme yapılmaz**.
 - `--no-query`: REST'e gitmeden yalnız CMS (hızlı); satır = rapor × universe, QUERY alanları boş.
 - `--apply`: **verilmezse DRY-RUN**, DB'ye yazılmaz, sadece CSV.
-- `--force`: REST hatası raporların %10'unu geçerse DB'ye yazılmaz; yine de yazmak için.
-- REST token: ilk raporun sorguları okunarak sırayla denenir, çalışan kullanılır (log: "token yöntemi: ..."):
+- `--full`: değişmemiş raporlar da yeniden işlenir (ör. kolon mantığı değiştiyse).
+- `--force`: silinecek rapor mevcutların %10'unu geçse de sil.
+- REST token: işlenecek ilk 5 rapordan biri okunarak sırayla denenir (tek bir bozuk rapor bağlantıyı düşürmesin), çalışan kullanılır (log: "token yöntemi: ..."):
   1. `logon`: CMS oturumundan `createLogonToken`
   2. `serialized`: CMS oturumunun serialize hali
   3. `rest`: REST'in kendi logon'u (`POST /logon/long`, aynı BO kullanıcısı). **+1 oturum/lisans**; iş sonunda logoff.
@@ -63,16 +87,22 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
   Tek bir yöntemi zorlamak için: `credentials.json` `restToken` ya da VM option `-Dbo.restToken=logon|serialized|rest` (VM option önceliklidir).
 
 ## Çıktılar
-- `reports\webidocuments_<HOST_6400>_<zaman>.csv` (ortam başına bir dosya): tablodaki kolonlar + `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`.
+- `reports\webidocuments_<HOST_6400>_<zaman>.csv` (ortam başına bir dosya, **rapor rapor yazılır**): tablodaki kolonlar +
+  `ISLEM`, `DURUM`, `DATASOURCE_TYPE`, `DATASOURCE_ID`, `NOT`. Değişmeyen raporlar CSV'ye yazılmaz (sadece sayısı logda).
 - `logs\webidocuments_*.log`
 
-**Durumlar:** `QUERY` (REST'ten sorgu okundu), `NO_QUERY` (raporda sorgu yok), `CMS_ONLY` (--no-query),
+**ISLEM:** `NEW`, `CHANGED`, `RETRY` (yazıldı / dry-run'da yazılacak), `FAILED` (DB hatası), `SKIPPED` (REST hatası,
+DB'deki satırlar korundu), `DELETED` / `DELETE` (dry-run) / `DELETE_SKIPPED` (silme koruması).
+
+**DURUM (satır):** `QUERY` (REST'ten sorgu okundu), `NO_QUERY` (raporda sorgu yok), `CMS_ONLY` (--no-query),
 `REST_FAILED` (REST hatası; universe CMS'ten).
 
 ## DB
-- `--apply` verildiyse uzun işten **önce** DB'ye bağlanıp mevcut satır sayısı okunur (tablo / yetki hatası erken çıkar).
-- Yazım: `DELETE ... WHERE SYSTEM = ?` + 500'lük batch INSERT, tek transaction; hata olursa rollback, eski veri kalır.
-- Sonra `COUNT(*)` ile doğrulanır. Hiç rapor bulunamadıysa DB'ye dokunulmaz.
+- Uzun işten **önce** DB'den mevcut durum okunur (tablo / yetki hatası erken çıkar). Dry-run'da da okunur
+  (karşılaştırma için); dry-run'da okunamazsa uyarı verilir, tüm raporlar yeni sayılır.
+- Rapor başına: `DELETE ... WHERE SYSTEM = ? AND CUID = ?` + INSERT, hemen COMMIT; hata olursa sadece o rapor rollback.
+- DB bağlantısı koparsa bir kez yeniden bağlanıp tekrar denenir.
+- Hiç rapor bulunamadıysa DB'ye dokunulmaz.
 - Uzun metinler kolon boyuna kırpılır (`WebiDocumentsDao.LEN_*`); tablo farklı boyutlardaysa sabitleri güncelleyin.
 
 Önerilen DDL (tablo zaten varsa kolon boylarını karşılaştırın):
@@ -94,7 +124,8 @@ CREATE TABLE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (
   DATASOURCE_CUID VARCHAR2(64),
   DATASOURCE_NAME VARCHAR2(500)
 );
-CREATE INDEX POPR.IX_WEBIDOC_SYSTEM ON POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (SYSTEM);
+-- Rapor bazında silme/yazma için (SYSTEM, CUID) indeksi önemli; eski IX_WEBIDOC_SYSTEM varsa bununla değiştirin
+CREATE INDEX POPR.IX_WEBIDOC_SYS_CUID ON POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (SYSTEM, CUID);
 ```
 Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8ISO8859P9).
 
@@ -103,6 +134,7 @@ Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8I
 2. `--no-query` ile tam dry-run: toplam rapor sayısını ve süreyi görün.
 3. Tam dry-run (REST'li), mesai sonrası. Log'daki "kalan tahmini" süreye bakın.
 4. Uygunsa `--apply` (mesai sonrası): `run_webidocuments.bat --env all --apply`.
+5. Günlük zamanlanmış görev: aynı komut. İlk gün uzun sürer, sonraki günler sadece fark işlenir.
 
 ## Gerçek SDK'da doğrulanacaklar
 - `SI_OWNER`, `SI_CREATION_TIME`, `SI_UPDATE_TS` değerlerinin `properties().getProperty(...)` ile String / Date geldiği.

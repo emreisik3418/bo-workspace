@@ -2,9 +2,11 @@
 rem Public Folders altindaki Webi raporlarinin sorgu ve universe bilgilerini
 rem POPR.SDK_METADATA_WEBIDOCUMENTS_JOB tablosuna yazar.
 rem Kullanim:
-rem   run_webidocuments.bat --env all [--no-query] [--apply] [--force]
+rem   run_webidocuments.bat --env all [--no-query] [--full] [--apply] [--force]
 rem   run_webidocuments.bat --env HOST:6400 [--rest URL] [--no-query] [--apply] [--force]
 rem --env all: credentials.json'daki tum ortamlar sirayla; biri hata verirse digerleri devam eder.
+rem Artimli: degismeyen raporlara dokunulmaz, yeni/degisen yazilir, CMS'te olmayan silinir (gunluk calisma icin).
+rem Her rapor islenince DB'ye yazilir ve kapatilir; is yarida kesilirse ertesi calisma kaldigi yerden devam eder.
 rem --apply verilmezse DRY-RUN: DB'ye yazilmaz, sadece reports\ altina CSV yazilir.
 rem Cikis kodu: 0 tum ortamlar basarili, 1 kismi, 2 hicbir ortam islenemedi.
 setlocal
