@@ -26,7 +26,7 @@ import java.util.Set;
 
 /**
  * Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe bilgilerini
- * POPR.SDK_METADATA_WEBIDOCUMENTS_JOB tablosuna yazar. Satır = raporun bir sorgusu. Günlük çalışacak şekilde ARTIMLI:
+ * EXT.EXT_TBOE_SDK_METADATA_WEBIREP tablosuna yazar. Satır = raporun bir sorgusu. Günlük çalışacak şekilde ARTIMLI:
  *   - DB'de olmayan rapor        -> eklenir
  *   - UPDATED_TIME değişmiş rapor -> satırları yenilenir
  *   - sorgusu boş satırı olan    -> tekrar denenir (önceki REST hatası vb.)

@@ -1,7 +1,7 @@
 # Webi rapor envanteri (WebiDocumentsApp)
 
 Public Folders altındaki Webi raporlarının sorgu (data provider) ve universe bilgilerini
-`POPR.SDK_METADATA_WEBIDOCUMENTS_JOB` tablosuna yazar. **Bir satır = bir raporun bir sorgusu.**
+`EXT.EXT_TBOE_SDK_METADATA_WEBIREP` tablosuna yazar. **Bir satır = bir raporun bir sorgusu.**
 Günlük çalışacak şekilde **artımlıdır** (bkz. "Günlük çalışma").
 
 ## Günlük çalışma (artımlı)
@@ -114,9 +114,9 @@ DB'deki satırlar korundu), `DELETED` / `DELETE` (dry-run) / `DELETE_SKIPPED` (s
   kesirli ...`); UPDATE yetkisi gerekmez (uygulama zaten DELETE + INSERT kullanır).
 - Uzun metinler kolon boyuna kırpılır (`WebiDocumentsDao.LEN_*`); tablo farklı boyutlardaysa sabitleri güncelleyin.
 
-Önerilen DDL (tablo zaten varsa kolon boylarını karşılaştırın):
+Referans DDL (tablo zaten var; mevcut tabloda tarih / ROW_ID kolonları metin olabilir, uygulama tipleri kendisi tespit eder):
 ```sql
-CREATE TABLE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (
+CREATE TABLE EXT.EXT_TBOE_SDK_METADATA_WEBIREP (
   ROW_ID          NUMBER,
   SYSTEM          VARCHAR2(100),
   EXPORT_DATE     DATE,
@@ -133,8 +133,8 @@ CREATE TABLE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (
   DATASOURCE_CUID VARCHAR2(64),
   DATASOURCE_NAME VARCHAR2(500)
 );
--- Rapor bazında silme/yazma için (SYSTEM, CUID) indeksi önemli; eski IX_WEBIDOC_SYSTEM varsa bununla değiştirin
-CREATE INDEX POPR.IX_WEBIDOC_SYS_CUID ON POPR.SDK_METADATA_WEBIDOCUMENTS_JOB (SYSTEM, CUID);
+-- Rapor bazında silme/yazma için (SYSTEM, CUID) indeksi önemli; yoksa DBA eklemeli
+CREATE INDEX EXT.IX_WEBIREP_SYS_CUID ON EXT.EXT_TBOE_SDK_METADATA_WEBIREP (SYSTEM, CUID);
 ```
 Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8ISO8859P9).
 

@@ -26,7 +26,7 @@ import java.util.Set;
  */
 final class WebiDocumentsDao {
 
-    static final String DEFAULT_TABLE = "POPR.SDK_METADATA_WEBIDOCUMENTS_JOB";
+    static final String DEFAULT_TABLE = "EXT.EXT_TBOE_SDK_METADATA_WEBIREP";
     private static final int DELETE_BATCH = 500;
 
     // Kolon uzunlukları (DDL ile aynı tutun; webidocuments.md). Uzun değerler kırpılır, ORA-12899 alınmaz.

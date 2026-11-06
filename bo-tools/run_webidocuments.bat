@@ -1,6 +1,6 @@
 @echo off
 rem Public Folders altindaki Webi raporlarinin sorgu ve universe bilgilerini
-rem POPR.SDK_METADATA_WEBIDOCUMENTS_JOB tablosuna yazar.
+rem EXT.EXT_TBOE_SDK_METADATA_WEBIREP tablosuna yazar.
 rem Kullanim:
 rem   run_webidocuments.bat --env all [--no-query] [--full] [--apply] [--force]
 rem   run_webidocuments.bat --env HOST:6400 [--rest URL] [--no-query] [--apply] [--force]

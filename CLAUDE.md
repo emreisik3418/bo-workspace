@@ -14,7 +14,7 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
   - `keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`,
     CSV yedek + doğrulama. SDK: `IInfoObject.getKeyword/setKeyword/save` (gerçek SDK'da henüz doğrulanmadı).
   - `webidocuments` `WebiDocumentsApp`: Public Folders altındaki Webi raporlarının sorgu (data provider) + universe
-    bilgilerini `POPR.SDK_METADATA_WEBIDOCUMENTS_JOB` tablosuna yazar (satır = rapor x sorgu). Günlük ARTIMLI:
+    bilgilerini `EXT.EXT_TBOE_SDK_METADATA_WEBIREP` tablosuna yazar (satır = rapor x sorgu). Günlük ARTIMLI:
     UPDATED_TIME aynıysa dokunma, yeni/değişen/sorgusu boş olanı rapor başına sil+yaz+COMMIT, CMS'te olmayanı sil (%10 koruması);
     her rapor işlenince REST'te kapatılır. Bağlantı testi ilk 5 rapordan biriyle (tek bozuk rapor ortamı düşürmesin).
     Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
