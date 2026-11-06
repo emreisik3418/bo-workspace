@@ -64,6 +64,7 @@ final class WebiDocumentsDao {
         int unparsedDates;
         String sampleDate;      // UPDATED_TIME'dan örnek ham değer
         String unparsedSample;  // okunamayan bir örnek
+        int fractionDates;      // saniye kesirli metin tarih (ilk sürümün yazdığı) -> rapor yeniden yazılır
     }
 
     /** Tablonun kolon tiplerini okur (tarih / ROW_ID kolonları metin olabilir). Dönen: log için özet. */
@@ -126,6 +127,9 @@ final class WebiDocumentsDao {
                             unparsed = true;
                             info.unparsedDates++;
                             if (info.unparsedSample == null) info.unparsedSample = raw;
+                        } else if (updated != null && !DateText.clean(raw).equals(raw.trim())) {
+                            unparsed = true;          // "04/07/2018 14:26:29,176000000": kesirsiz biçimde yeniden yazılsın
+                            info.fractionDates++;
                         }
                     } else {
                         Timestamp t = rs.getTimestamp(2);

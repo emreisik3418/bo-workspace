@@ -230,6 +230,10 @@ public final class WebiDocumentsApp {
                         log.info("Tarih kolonları metin: örnek UPDATED_TIME = \"" + info.sampleDate + "\", yazma biçimi: "
                                 + o.dao.getDatePattern() + (forcedPattern != null ? " (-Dbo.dateFormat)" : ""));
                     }
+                    if (info.fractionDates > 0) {
+                        log.info(info.fractionDates + " satırda tarih saniye kesirli (ilk sürümden); bu raporlar kesirsiz"
+                                + " biçimde yeniden yazılacak (bir kerelik).");
+                    }
                     if (info.unparsedDates > 0) {
                         log.warn(info.unparsedDates + " satırda UPDATED_TIME okunamadı (örnek: \"" + info.unparsedSample
                                 + "\"); bu raporlar yeniden yazılacak. Biçim bildirilirse eklenebilir.");

@@ -109,15 +109,9 @@ DB'deki satırlar korundu), `DELETED` / `DELETE` (dry-run) / `DELETE_SKIPPED` (s
   (log: `örnek UPDATED_TIME = "...", yazma biçimi: ...`). Biçimi zorlamak için VM option `-Dbo.dateFormat="dd.MM.yyyy HH:mm:ss"`.
   Okunamayan tarihli raporlar yeniden yazılır (kendiliğinden düzelir); logda örnek değer yazar.
   Tarihler **saniye kesri olmadan** yazılır (`04/07/2018 14:26:29`); tablo boşsa biçim `dd/MM/yyyy HH:mm:ss`.
-- İlk sürüm metin kolonlara Oracle'ın varsayılan biçimiyle kesirli yazmıştı (`04/07/2018 14:26:29,176000000`).
-  Bir kerelik düzeltme (önce yedek):
-  ```sql
-  CREATE TABLE POPR.SDK_METADATA_WEBIDOC_BAK AS SELECT * FROM POPR.SDK_METADATA_WEBIDOCUMENTS_JOB;
-  UPDATE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB SET CREATION_TIME = SUBSTR(CREATION_TIME, 1, INSTR(CREATION_TIME, ',') - 1) WHERE INSTR(CREATION_TIME, ',') > 0;
-  UPDATE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB SET UPDATED_TIME  = SUBSTR(UPDATED_TIME,  1, INSTR(UPDATED_TIME,  ',') - 1) WHERE INSTR(UPDATED_TIME,  ',') > 0;
-  UPDATE POPR.SDK_METADATA_WEBIDOCUMENTS_JOB SET EXPORT_DATE   = SUBSTR(EXPORT_DATE,   1, INSTR(EXPORT_DATE,   ',') - 1) WHERE INSTR(EXPORT_DATE,   ',') > 0;
-  COMMIT;
-  ```
+- İlk sürüm metin kolonlara Oracle'ın varsayılan biçimiyle kesirli yazmıştı (`04/07/2018 14:26:29,176000000`,
+  PATH başında `/`). Kesirli tarihi olan raporlar **kendiliğinden bir kez yeniden yazılır** (log: `... satırda tarih saniye
+  kesirli ...`); UPDATE yetkisi gerekmez (uygulama zaten DELETE + INSERT kullanır).
 - Uzun metinler kolon boyuna kırpılır (`WebiDocumentsDao.LEN_*`); tablo farklı boyutlardaysa sabitleri güncelleyin.
 
 Önerilen DDL (tablo zaten varsa kolon boylarını karşılaştırın):
