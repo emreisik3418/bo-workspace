@@ -12,7 +12,8 @@ import java.util.Locale;
  */
 final class DateText {
 
-    static final String DEFAULT_PATTERN = "yyyy-MM-dd HH:mm:ss";
+    /** Tablo boşsa / örnek okunamazsa kullanılan biçim (mevcut veriyle aynı: gün/ay/yıl, saniye kesri yok). */
+    static final String DEFAULT_PATTERN = "dd/MM/yyyy HH:mm:ss";
 
     /** Sıra önemli: Türkiye'de gün önce yazıldığı için dd.MM / dd/MM, MM/dd'den önce denenir. */
     static final String[] PATTERNS = {

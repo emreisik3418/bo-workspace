@@ -257,14 +257,14 @@ final class WebiDocumentsDao {
         return s;
     }
 
-    /** Kolon metinse mevcut biçimde metin, değilse TIMESTAMP yazar. */
+    /** Kolon metinse mevcut biçimde metin (saniye kesri yok), değilse saniyeye yuvarlanmış TIMESTAMP yazar. */
     private void setDate(PreparedStatement ps, int i, Date d, String column) throws SQLException {
         if (isChar(column)) {
             if (d == null) ps.setNull(i, Types.VARCHAR);
             else ps.setString(i, DateText.format(d, datePattern));
         } else {
             if (d == null) ps.setNull(i, Types.TIMESTAMP);
-            else ps.setTimestamp(i, new Timestamp(d.getTime()));
+            else ps.setTimestamp(i, new Timestamp(Math.floorDiv(d.getTime(), 1000L) * 1000L));   // saniye kesri yok
         }
     }
 
