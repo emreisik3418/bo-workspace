@@ -19,9 +19,11 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
   İş yarıda kesilirse o ana kadar yazılanlar kalır; ertesi çalıştırma onları `UNCHANGED` sayar, kalanlardan devam eder.
 - REST hatası: **yeni** rapor CMS universe bilgisiyle yazılır (QUERY boş → ertesi gün `RETRY`);
   **DB'de olan** rapora dokunulmaz, eski satırlar korunur (`SKIPPED`), ertesi gün tekrar denenir.
-- **REST oturumu yenileme:** bir rapor REST hatası verirse oturum yenilenip (eski oturum logoff) rapor bir kez daha denenir;
-  ayrıca 1000 raporda bir oturum düzenli yenilenir. İlk tam çalıştırmada GMP03 ~4 saat / 11.309 rapordan sonra art arda
-  HTTP 400 almıştı (oturum süresi / oturum başına açık doküman sınırı olduğu düşünülüyor).
+- **Bozuk raporlar:** `WIS 30951` ("document cannot be retrieved from the File Repository Server": dosya depoda yok)
+  raporun kendisinin sorunudur: tekrar denenmez, art arda hata sayacına girmez (WARN; CSV `NOT` kolonunda kod).
+  İlk tam çalıştırmada GMP03, SI_ID'leri ardışık bozuk bir grup yüzünden 11.309. rapordan sonra durmuştu.
+- **REST oturumu yenileme:** diğer REST hatalarında oturum yenilenip (eski oturum logoff) rapor bir kez daha denenir;
+  ayrıca 1000 raporda bir oturum düzenli yenilenir.
 - Korumalar: art arda 20 raporda REST hatası (sunucu düşmüş olabilir) ya da 5 raporda DB hatası → ortam durur,
   silme yapılmaz. Silinecek rapor mevcutların %10'unu geçerse (≥100 raporda) silinmez → `DELETE_SKIPPED`, `--force` gerekir.
 - İlk çalıştırma: tablo boşsa tüm raporlar `NEW` (uzun sürer, mesai sonrası). Sonraki günler sadece fark işlenir.
@@ -53,7 +55,7 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
 | PATH | Klasör yolu, rapor adı hariç, başta `/` yok (eski uygulamayla aynı): `Public Folders/AKBANK/Risk` |
 | QUERY_ID, QUERY_NAME | REST `GET /raylight/v1/documents/{SI_ID}/dataproviders` → `id` (DP0), `name` |
 | DATASOURCE_CUID, DATASOURCE_NAME | Sorgunun `dataSourceId` (SI_ID) → CMS'te `CI_APPOBJECTS`, yoksa `CI_INFOOBJECTS` |
-| SYSTEM | CMS (`HOST:6400`) |
+| SYSTEM | CMS sunucusu, **portsuz** (eski uygulamayla aynı): `WBO42GMP03`. Önceki sürümün portlu yazdığı satırlar ilk `--apply`'da bir kez taşınır (UPDATE; yetki yoksa INSERT ... SELECT + DELETE) |
 | EXPORT_DATE | Raporun **en son yazıldığı** çalıştırmanın zamanı (değişmeyen raporlarda eski tarih kalır) |
 | ROW_ID | Sıra numarası; her yazımda SYSTEM'deki en büyük ROW_ID'nin üstünden devam eder, primary key değil |
 

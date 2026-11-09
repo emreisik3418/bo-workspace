@@ -117,6 +117,16 @@ final class WebiRestClient {
     void setOwnsSession(boolean ownsSession) { this.ownsSession = ownsSession; }
 
     /**
+     * Raporun kendisinden kaynaklanan hata mı (oturumla ilgisi yok, yeni oturumla da düzelmez)?
+     *   WIS 30951: "The document cannot be retrieved from the File Repository Server" (dosya depoda yok)
+     */
+    static boolean isDocumentError(Exception e) {
+        if (!(e instanceof HttpStatusException)) return false;
+        String m = e.getMessage();
+        return m != null && (m.contains("WIS 30951") || m.contains("File Repository Server"));
+    }
+
+    /**
      * Yeni oturum: (kendi oturumuysa) eskisini logoff eder, yeni token alır. Uzun işte oturum süresi dolduğunda ya da
      * sunucuda oturum başına açık doküman sınırına ulaşıldığında hataları temizler.
      */

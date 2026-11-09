@@ -212,6 +212,7 @@ public final class WebiDocumentsApp {
     /** Tek bir ortam: DB durumu -> CMS listesi -> plan -> rapor rapor REST + DB + CSV -> silme. */
     private static int runEnv(Opts o, BoEnvironment env, RunLog log) throws Exception {
         String cms = env.getCms();
+        String system = systemName(cms);   // DB'deki SYSTEM: portsuz (eski uygulamayla aynı), ör. WBO42GMP03
         Credential boCredential = o.sbox.get(env.getSbox());
 
         try (Db db = o.dbCredential == null ? null : new Db(o.config.getDbJdbcUrl(), o.dbCredential)) {
@@ -221,12 +222,25 @@ public final class WebiDocumentsApp {
             if (db != null) {
                 try {
                     log.info("DB kolon tipleri: " + o.dao.detectColumns(db.get()));
+                    // Önceki sürüm SYSTEM'i portlu yazmıştı (WBO42GMP03:6400): portsuza taşı (bir kerelik)
+                    String stateSystem = system;
+                    if (!system.equals(cms)) {
+                        int legacy = o.dao.count(db.get(), cms);
+                        if (legacy > 0 && o.apply) {
+                            String how = o.dao.migrateSystem(db.get(), cms, system);
+                            log.info("SYSTEM " + cms + " -> " + system + ": " + legacy + " satır taşındı (" + how + ").");
+                        } else if (legacy > 0) {
+                            stateSystem = cms;
+                            log.info("DRY-RUN: SYSTEM=" + cms + " olan " + legacy + " satır --apply ile " + system
+                                    + " olarak taşınacak; plan bu satırlara göre hesaplandı.");
+                        }
+                    }
                     WebiDocumentsDao.LoadInfo info = new WebiDocumentsDao.LoadInfo();
-                    existing = o.dao.loadState(db.get(), cms, info);
+                    existing = o.dao.loadState(db.get(), stateSystem, info);
                     rowId = info.maxRowId;
                     String forcedPattern = System.getProperty("bo.dateFormat");
                     if (forcedPattern != null) o.dao.setDatePattern(forcedPattern.trim());
-                    log.info("DB: " + o.table + " içinde SYSTEM=" + cms + " için mevcut rapor: " + existing.size()
+                    log.info("DB: " + o.table + " içinde SYSTEM=" + system + " için mevcut rapor: " + existing.size()
                             + " (" + info.rows + " satır), en büyük ROW_ID: " + info.maxRowId);
                     if (o.dao.isChar("UPDATED_TIME")) {
                         log.info("Tarih kolonları metin: örnek UPDATED_TIME = \"" + info.sampleDate + "\", yazma biçimi: "
@@ -272,7 +286,7 @@ public final class WebiDocumentsApp {
                 }
 
                 Path csvPath = o.base.resolve("reports").resolve("webidocuments_" + fileSafe(cms) + "_" + o.stamp + ".csv");
-                try (CsvOut csv = new CsvOut(csvPath, cms, o.exportDate)) {
+                try (CsvOut csv = new CsvOut(csvPath, system, o.exportDate)) {
                     log.info("CSV (rapor rapor yazılıyor): " + csvPath);
 
                     // ---- 4) REST bağlantısı (işlenecek rapor varsa)
@@ -290,7 +304,7 @@ public final class WebiDocumentsApp {
                     // ---- 5) Rapor rapor: REST -> kapat -> veri kaynağı -> DB (COMMIT) -> CSV
                     Map<Integer, String[]> dsCache = new HashMap<>();
                     int done = 0, written = 0, writtenRows = 0, kept = 0, dbFailed = 0, restFailed = 0;
-                    int restStreak = 0, dbStreak = 0, retryOk = 0;
+                    int restStreak = 0, dbStreak = 0, retryOk = 0, docErrors = 0;
                     boolean aborted = false;
                     long started = System.currentTimeMillis();
                     try {
@@ -310,23 +324,37 @@ public final class WebiDocumentsApp {
                                     dps = rest.dataProviders(d.id);
                                     restStreak = 0;
                                 } catch (Exception first) {
-                                    // Oturum düşmüş / doküman sınırı dolmuş olabilir: yeni oturumla bir kez daha dene
-                                    try {
-                                        rest.closeDocument(d.id);    // eski oturumda açık kalmasın (hata beklenir, sessiz)
-                                    } catch (Exception ignore) {
-                                        // oturum düşmüşse kapatma da hata verir
-                                    }
-                                    renewQuietly(rest, "hata sonrası (" + RunLog.describe(first) + ")", log);
-                                    try {
-                                        dps = rest.dataProviders(d.id);
-                                        restStreak = 0;
-                                        retryOk++;
-                                        log.info("[" + d.cuid + "] yeni oturumla okundu.");
-                                    } catch (Exception e) {
+                                    if (WebiRestClient.isDocumentError(first)) {
+                                        // Raporun kendisi bozuk (ör. dosya deposunda yok): oturumla ilgisi yok, tekrar denenmez,
+                                        // art arda hata sayacına da girmez (bozuk raporlar SI_ID sırasında yan yana gelebiliyor)
                                         restFailed++;
-                                        restStreak++;
-                                        restError = RunLog.describe(e);
-                                        log.error("[" + d.cuid + "] " + d.name + " sorguları okunamadı", e);
+                                        docErrors++;
+                                        restError = RunLog.describe(first);
+                                        log.warn("[" + d.cuid + "] " + d.name + " raporu sunucuda açılamıyor: " + restError);
+                                    } else {
+                                        // Oturum düşmüş / doküman sınırı dolmuş olabilir: yeni oturumla bir kez daha dene
+                                        try {
+                                            rest.closeDocument(d.id);    // eski oturumda açık kalmasın (hata beklenir, sessiz)
+                                        } catch (Exception ignore) {
+                                            // oturum düşmüşse kapatma da hata verir
+                                        }
+                                        renewQuietly(rest, "hata sonrası (" + RunLog.describe(first) + ")", log);
+                                        try {
+                                            dps = rest.dataProviders(d.id);
+                                            restStreak = 0;
+                                            retryOk++;
+                                            log.info("[" + d.cuid + "] yeni oturumla okundu.");
+                                        } catch (Exception e) {
+                                            restFailed++;
+                                            restError = RunLog.describe(e);
+                                            if (WebiRestClient.isDocumentError(e)) {
+                                                docErrors++;
+                                                log.warn("[" + d.cuid + "] " + d.name + " raporu sunucuda açılamıyor: " + restError);
+                                            } else {
+                                                restStreak++;
+                                                log.error("[" + d.cuid + "] " + d.name + " sorguları okunamadı", e);
+                                            }
+                                        }
                                     }
                                 } finally {
                                     closeQuietly(rest, d.id, log);   // hata olsa da olmasa da rapor hemen kapatılır
@@ -352,7 +380,7 @@ public final class WebiDocumentsApp {
                                 String csvAction = action.name();
                                 if (o.apply) {
                                     try {
-                                        writeDocument(o, db, cms, d, rows);
+                                        writeDocument(o, db, system, d, rows);
                                         written++;
                                         writtenRows += rows.size();
                                         dbStreak = 0;
@@ -404,7 +432,7 @@ public final class WebiDocumentsApp {
                                     + " satırlarını kontrol edin, doğruysa --force ile çalıştırın.", n, existing.size()));
                             for (String cuid : plan.toDelete) csv.deleted("DELETE_SKIPPED", cuid, "CMS listesinde yok");
                         } else if (o.apply) {
-                            deleted = deleteDocuments(o, db, cms, plan.toDelete);
+                            deleted = deleteDocuments(o, db, system, plan.toDelete);
                             for (String cuid : plan.toDelete) csv.deleted("DELETED", cuid, "CMS listesinde yok");
                             log.info("CMS'te artık olmayan " + n + " rapor DB'den silindi (" + deleted + " satır).");
                         } else {
@@ -414,6 +442,7 @@ public final class WebiDocumentsApp {
                     }
 
                     if (retryOk > 0) log.info("Yeni REST oturumuyla kurtarılan rapor: " + retryOk);
+                    if (docErrors > 0) log.info("Sunucuda açılamayan (bozuk) rapor: " + docErrors + " (CSV'de NOT kolonunda WIS kodu)");
                     log.info(String.format("[%s] Sonuç: işlenen %d / %d, yazılan %d rapor (%d satır), değişmeyen %d,"
                                     + " REST hatası %d (DB'deki korunan %d), DB hatası %d, silinen rapor %d%s",
                             cms, done, work.size(), written, writtenRows, plan.count(SyncPlan.Action.UNCHANGED),
@@ -544,6 +573,11 @@ public final class WebiDocumentsApp {
                 c = null;
             }
         }
+    }
+
+    /** DB'ye yazılan SYSTEM: CMS adresinden port atılır ("WBO42GMP03:6400" -> "WBO42GMP03"). */
+    static String systemName(String cms) {
+        return cms.trim().replaceFirst(":\\d+$", "");
     }
 
     /** "HOST:6400" -> "HOST_6400" (dosya adı için). */

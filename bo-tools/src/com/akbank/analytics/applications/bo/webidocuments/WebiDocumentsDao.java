@@ -54,6 +54,8 @@ final class WebiDocumentsDao {
 
     /** Metin tipindeki kolonlar (büyük harf). detectColumns ile dolar. */
     private final Set<String> charColumns = new HashSet<>();
+    /** Tablonun tüm kolonları (sırasıyla). detectColumns ile dolar. */
+    private final List<String> allColumns = new java.util.ArrayList<>();
     /** Metin tarih kolonlarına yazarken kullanılan biçim (mevcut veriden tespit edilir). */
     private String datePattern = DateText.DEFAULT_PATTERN;
 
@@ -70,12 +72,14 @@ final class WebiDocumentsDao {
     /** Tablonun kolon tiplerini okur (tarih / ROW_ID kolonları metin olabilir). Dönen: log için özet. */
     String detectColumns(Connection c) throws SQLException {
         charColumns.clear();
+        allColumns.clear();
         StringBuilder sb = new StringBuilder();
         try (PreparedStatement ps = c.prepareStatement("SELECT * FROM " + table + " WHERE 1 = 0");
              ResultSet rs = ps.executeQuery()) {
             ResultSetMetaData md = rs.getMetaData();
             for (int i = 1; i <= md.getColumnCount(); i++) {
                 String name = md.getColumnName(i).toUpperCase(Locale.ROOT);
+                allColumns.add(name);
                 int t = md.getColumnType(i);
                 boolean isChar = t == Types.CHAR || t == Types.VARCHAR || t == Types.NCHAR || t == Types.NVARCHAR
                         || t == Types.LONGVARCHAR || t == Types.LONGNVARCHAR || t == Types.CLOB || t == Types.NCLOB;
@@ -90,6 +94,54 @@ final class WebiDocumentsDao {
     }
 
     boolean isChar(String column) { return charColumns.contains(column); }
+
+    /**
+     * SYSTEM değerini değiştirir (bir kerelik taşıma: "HOST:6400" -> "HOST"). Önce UPDATE denenir; UPDATE yetkisi yoksa
+     * aynı transaction'da INSERT ... SELECT (SYSTEM yeni değerle) + DELETE yapılır — veri sunucuda kopyalanır, karakter seti
+     * sorunu olmaz. Dönen: kullanılan yöntem (log için).
+     */
+    String migrateSystem(Connection c, String from, String to) throws SQLException {
+        boolean oldAuto = c.getAutoCommit();
+        c.setAutoCommit(false);
+        try {
+            try (PreparedStatement up = c.prepareStatement("UPDATE " + table + " SET SYSTEM = ? WHERE SYSTEM = ?")) {
+                up.setString(1, to);
+                up.setString(2, from);
+                up.executeUpdate();
+                c.commit();
+                return "UPDATE";
+            } catch (SQLException e) {
+                try { c.rollback(); } catch (SQLException ignore) { /* asıl hata önemli */ }
+                if (allColumns.isEmpty() || !allColumns.contains("SYSTEM")) throw e;
+            }
+            StringBuilder cols = new StringBuilder();
+            StringBuilder sel = new StringBuilder();
+            for (String col : allColumns) {
+                if (cols.length() > 0) {
+                    cols.append(", ");
+                    sel.append(", ");
+                }
+                cols.append(col);
+                sel.append(col.equals("SYSTEM") ? "?" : col);
+            }
+            try (PreparedStatement ins = c.prepareStatement("INSERT INTO " + table + " (" + cols + ") SELECT " + sel
+                    + " FROM " + table + " WHERE SYSTEM = ?");
+                 PreparedStatement del = c.prepareStatement("DELETE FROM " + table + " WHERE SYSTEM = ?")) {
+                ins.setString(1, to);
+                ins.setString(2, from);
+                ins.executeUpdate();
+                del.setString(1, from);
+                del.executeUpdate();
+            }
+            c.commit();
+            return "UPDATE yetkisi yok: INSERT ... SELECT + DELETE";
+        } catch (SQLException | RuntimeException e) {
+            try { c.rollback(); } catch (SQLException ignore) { /* asıl hata önemli */ }
+            throw e;
+        } finally {
+            try { c.setAutoCommit(oldAuto); } catch (SQLException ignore) { /* bağlantı kopmuş olabilir */ }
+        }
+    }
 
     String getDatePattern() { return datePattern; }
 
