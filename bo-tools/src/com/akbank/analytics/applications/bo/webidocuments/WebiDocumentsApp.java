@@ -61,6 +61,8 @@ public final class WebiDocumentsApp {
     private static final int MAX_CONSECUTIVE_REST_FAIL = 20;
     /** Art arda bu kadar raporda DB hatası olursa ortam durdurulur. */
     private static final int MAX_CONSECUTIVE_DB_FAIL = 5;
+    /** REST oturumu bu kadar raporda bir yenilenir (oturum süresi / açık doküman sınırı birikmesin). */
+    private static final int RENEW_EVERY_DOCS = 1000;
     /** REST bağlantı testinde denenecek rapor sayısı. */
     private static final int PROBE_DOCS = 5;
     /** Silinecek rapor mevcutların bu oranını geçerse --force olmadan silinmez (liste eksik okunmuş olabilir). */
@@ -288,7 +290,7 @@ public final class WebiDocumentsApp {
                     // ---- 5) Rapor rapor: REST -> kapat -> veri kaynağı -> DB (COMMIT) -> CSV
                     Map<Integer, String[]> dsCache = new HashMap<>();
                     int done = 0, written = 0, writtenRows = 0, kept = 0, dbFailed = 0, restFailed = 0;
-                    int restStreak = 0, dbStreak = 0;
+                    int restStreak = 0, dbStreak = 0, retryOk = 0;
                     boolean aborted = false;
                     long started = System.currentTimeMillis();
                     try {
@@ -301,14 +303,31 @@ public final class WebiDocumentsApp {
                             } else {
                                 String restError = null;
                                 List<WebiRestClient.DataProvider> dps = null;
+                                if (done > 1 && (done - 1) % RENEW_EVERY_DOCS == 0) {
+                                    renewQuietly(rest, "düzenli yenileme (" + RENEW_EVERY_DOCS + " raporda bir)", log);
+                                }
                                 try {
                                     dps = rest.dataProviders(d.id);
                                     restStreak = 0;
-                                } catch (Exception e) {
-                                    restFailed++;
-                                    restStreak++;
-                                    restError = RunLog.describe(e);
-                                    log.error("[" + d.cuid + "] " + d.name + " sorguları okunamadı", e);
+                                } catch (Exception first) {
+                                    // Oturum düşmüş / doküman sınırı dolmuş olabilir: yeni oturumla bir kez daha dene
+                                    try {
+                                        rest.closeDocument(d.id);    // eski oturumda açık kalmasın (hata beklenir, sessiz)
+                                    } catch (Exception ignore) {
+                                        // oturum düşmüşse kapatma da hata verir
+                                    }
+                                    renewQuietly(rest, "hata sonrası (" + RunLog.describe(first) + ")", log);
+                                    try {
+                                        dps = rest.dataProviders(d.id);
+                                        restStreak = 0;
+                                        retryOk++;
+                                        log.info("[" + d.cuid + "] yeni oturumla okundu.");
+                                    } catch (Exception e) {
+                                        restFailed++;
+                                        restStreak++;
+                                        restError = RunLog.describe(e);
+                                        log.error("[" + d.cuid + "] " + d.name + " sorguları okunamadı", e);
+                                    }
                                 } finally {
                                     closeQuietly(rest, d.id, log);   // hata olsa da olmasa da rapor hemen kapatılır
                                 }
@@ -394,6 +413,7 @@ public final class WebiDocumentsApp {
                         }
                     }
 
+                    if (retryOk > 0) log.info("Yeni REST oturumuyla kurtarılan rapor: " + retryOk);
                     log.info(String.format("[%s] Sonuç: işlenen %d / %d, yazılan %d rapor (%d satır), değişmeyen %d,"
                                     + " REST hatası %d (DB'deki korunan %d), DB hatası %d, silinen rapor %d%s",
                             cms, done, work.size(), written, writtenRows, plan.count(SyncPlan.Action.UNCHANGED),
@@ -433,6 +453,15 @@ public final class WebiDocumentsApp {
         }
         log.info("RESTful bağlantısı tamam: " + restUrl + " (token yöntemi: " + modeOut[0] + ")");
         return rest;
+    }
+
+    private static void renewQuietly(WebiRestClient rest, String why, RunLog log) {
+        try {
+            rest.renewSession();
+            log.info("REST oturumu yenilendi: " + why);
+        } catch (Exception e) {
+            log.warn("REST oturumu yenilenemedi (" + why + "): " + RunLog.describe(e));
+        }
     }
 
     private static void closeQuietly(WebiRestClient rest, int docId, RunLog log) {
@@ -583,6 +612,7 @@ public final class WebiDocumentsApp {
                     return null;
                 }
                 client = new WebiRestClient(restUrl, src);
+                client.setOwnsSession(MODE_REST.equals(mode));
                 // Tek rapor kendi içinde hatalı olabilir: ilk birkaç rapordan biri okunabiliyorsa yöntem çalışıyor sayılır
                 Exception last = null;
                 for (Integer id : probeDocIds) {

@@ -16,7 +16,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
   - `webidocuments` `WebiDocumentsApp`: Public Folders altındaki Webi raporlarının sorgu (data provider) + universe
     bilgilerini `EXT.EXT_TBOE_SDK_METADATA_WEBIREP` tablosuna yazar (satır = rapor x sorgu). Günlük ARTIMLI:
     UPDATED_TIME aynıysa dokunma, yeni/değişen/sorgusu boş olanı rapor başına sil+yaz+COMMIT, CMS'te olmayanı sil (%10 koruması);
-    her rapor işlenince REST'te kapatılır. Bağlantı testi ilk 5 rapordan biriyle (tek bozuk rapor ortamı düşürmesin).
+    her rapor işlenince REST'te kapatılır; REST hatasında oturum yenilenip bir kez daha denenir, 1000 raporda bir düzenli yenileme
+    (GMP03'te ~4 saat sonra art arda HTTP 400 almıştık). Bağlantı testi ilk 5 rapordan biriyle (tek bozuk rapor ortamı düşürmesin).
     Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
     ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);
     REST adresi credentials.json'daki mevcut `biprwsUrl` alanından (CMS sunucusundan farklı olabilir).

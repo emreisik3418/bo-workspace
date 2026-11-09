@@ -19,6 +19,9 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
   İş yarıda kesilirse o ana kadar yazılanlar kalır; ertesi çalıştırma onları `UNCHANGED` sayar, kalanlardan devam eder.
 - REST hatası: **yeni** rapor CMS universe bilgisiyle yazılır (QUERY boş → ertesi gün `RETRY`);
   **DB'de olan** rapora dokunulmaz, eski satırlar korunur (`SKIPPED`), ertesi gün tekrar denenir.
+- **REST oturumu yenileme:** bir rapor REST hatası verirse oturum yenilenip (eski oturum logoff) rapor bir kez daha denenir;
+  ayrıca 1000 raporda bir oturum düzenli yenilenir. İlk tam çalıştırmada GMP03 ~4 saat / 11.309 rapordan sonra art arda
+  HTTP 400 almıştı (oturum süresi / oturum başına açık doküman sınırı olduğu düşünülüyor).
 - Korumalar: art arda 20 raporda REST hatası (sunucu düşmüş olabilir) ya da 5 raporda DB hatası → ortam durur,
   silme yapılmaz. Silinecek rapor mevcutların %10'unu geçerse (≥100 raporda) silinmez → `DELETE_SKIPPED`, `--force` gerekir.
 - İlk çalıştırma: tablo boşsa tüm raporlar `NEW` (uzun sürer, mesai sonrası). Sonraki günler sadece fark işlenir.

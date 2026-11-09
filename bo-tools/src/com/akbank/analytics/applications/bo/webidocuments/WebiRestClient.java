@@ -47,6 +47,8 @@ final class WebiRestClient {
     private final String baseUrl;      // ör. http://HOST:6405/biprws
     private final TokenSource tokens;
     private String token;
+    /** true: token REST'in kendi logon'uyla alındı (ayrı oturum) -> yenilerken eski oturum logoff edilir (lisans sızmasın). */
+    private boolean ownsSession;
 
     WebiRestClient(String baseUrl, TokenSource tokens) throws Exception {
         this.baseUrl = trim(baseUrl);
@@ -112,6 +114,23 @@ final class WebiRestClient {
         }
     }
 
+    void setOwnsSession(boolean ownsSession) { this.ownsSession = ownsSession; }
+
+    /**
+     * Yeni oturum: (kendi oturumuysa) eskisini logoff eder, yeni token alır. Uzun işte oturum süresi dolduğunda ya da
+     * sunucuda oturum başına açık doküman sınırına ulaşıldığında hataları temizler.
+     */
+    void renewSession() throws Exception {
+        if (ownsSession) {
+            try {
+                http(baseUrl, "POST", "/logoff", null, token);
+            } catch (Exception ignore) {
+                // eski oturum zaten düşmüş olabilir
+            }
+        }
+        token = tokens.newToken();
+    }
+
     /** REST oturumunu kapatır (sadece restLogon ile açıldıysa anlamlı). */
     void logoff() throws Exception {
         call("POST", "/logoff", null);
@@ -122,7 +141,7 @@ final class WebiRestClient {
             return http(baseUrl, method, path, body, token);
         } catch (HttpStatusException e) {
             if (e.code != 401) throw e;
-            token = tokens.newToken();                // token süresi dolmuş olabilir: bir kez yenile
+            renewSession();                           // token süresi dolmuş olabilir: bir kez yenile
             return http(baseUrl, method, path, body, token);
         }
     }
