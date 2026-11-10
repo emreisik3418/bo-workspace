@@ -26,6 +26,10 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
     Mevcut tabloda tarih kolonları METİN (VARCHAR2) çıktı (getTimestamp → "Timestamp format must be yyyy-mm-dd"):
     kolon tipleri ResultSetMetaData ile tespit edilir, metin tarih `DateText` ile okunur/mevcut biçimde yazılır. PATH başta `/` olmadan.
     REST hatasında CMS `SI_UNIVERSE`/`SI_DSL_UNIVERSE` yedeği. Dry-run = CSV; `--apply` = DB. Ayrıntı: `bo-tools/webidocuments.md`.
+  - `universeconnections` `UniverseConnectionsApp`: UNX + UNV universe x connection (SYSTEM, UNIVERSE_CUID/NAME/PATH,
+    CONNECTION_CUID/NAME, DBMS, DATABASE, DATABASE_USER, NETWORK_LAYER; ör. Oracle 12c / EXADATA_STANDBY); eşleşmeyen taraf boş satır.
+    Tablo mevcut (adı kullanıcıdan bekleniyor). ŞU AN sadece `--diag` (tüm CMS özelliklerini döker): connection alanlarının
+    hangi özellikte olduğu doğrulanınca yazım eklenecek. Ayrıntı: `bo-tools/universeconnections.md`.
 
 ## Çalışma şekli (kullanıcı ortamı)
 - Kullanıcı bir banka iş bilgisayarında çalışıyor. GitHub'dan **indiremiyor**; dosyaları repodan elle kopyala-yapıştır yapıyor.
