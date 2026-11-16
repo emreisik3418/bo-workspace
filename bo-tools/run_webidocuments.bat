@@ -12,9 +12,9 @@ rem Cikis kodu: 0 tum ortamlar basarili, 1 kismi, 2 hicbir ortam islenemedi.
 setlocal
 set BO=C:\Program Files (x86)\SAP BusinessObjects\SAP BusinessObjects Enterprise XI 4.0
 set APP=C:\batchs\BusinessObjects\BOTOOLS
-rem Klasor yapisi (Eclipse > Export > Runnable JAR file > "Copy required libraries into a sub-folder"):
+rem Klasor yapisi (IntelliJ > Build Artifacts, bo-tools.jar = sadece modul ciktisi; kutuphaneler elle kopyalanir):
 rem   %APP%\lib\bo-tools.jar           bizim siniflar
-rem   %APP%\lib\bo-tools_lib\*.jar     Eclipse'in kopyaladigi kutuphaneler (axis, ojdbc, json)
+rem   %APP%\lib\bo-tools_lib\*.jar     axis, ojdbc, json kutuphaneleri (bir kez kopyalanir)
 rem   %APP%\config\credentials.json
 rem sl_sdk.jar BO kurulumundan ve EN BASTA verilir: manifest Class-Path'i diger BO jar'larini
 rem kurulum klasorune gore yukler. bo-tools_lib altina kopyalanan sl_sdk.jar silinmeli.

@@ -143,12 +143,14 @@ CREATE INDEX EXT.IX_WEBIREP_SYS_CUID ON EXT.EXT_TBOE_SDK_METADATA_WEBIREP (SYSTE
 ```
 Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8ISO8859P9).
 
-## Jar ve bat ile çalıştırma
-1. Eclipse'te `WebiDocumentsApp`'i bir kez Run As > Java Application ile çalıştırın (launch configuration oluşsun).
-2. File > Export > Java > **Runnable JAR file**: launch configuration = WebiDocumentsApp,
-   hedef `C:\batchs\BusinessObjects\BOTOOLS\lib\bo-tools.jar`, **Copy required libraries into a sub-folder**.
-3. `lib\bo-tools_lib\` altındaki **sl_sdk.jar'ı silin** (ve varsa diğer BO jar'larını); BO kurulumundaki kullanılır.
-4. `run_webidocuments.bat` → `C:\batchs\BusinessObjects\BOTOOLS\`, `credentials.json` → `...\BOTOOLS\config\`.
+## Jar ve bat ile çalıştırma (IntelliJ)
+1. File > Project Structure > Artifacts > + > JAR > **Empty**. Ad `bo-tools`, Output directory
+   `C:\batchs\BusinessObjects\BOTOOLS\lib`, jar adı `bo-tools.jar`. Sağdaki Available Elements'ten
+   **'bo-tools' compile output**'u jar'ın içine ekleyin. **Kütüphane eklemeyin** (BO_SDK hiç; diğerleri ayrı klasörde).
+2. Build > Build Artifacts > bo-tools > Build (kod değişince Rebuild).
+3. Bir kez: SOAP_AXIS, ORACLE_JDBC, JSON kütüphanelerinin jar'larını `...\BOTOOLS\lib\bo-tools_lib\` altına kopyalayın
+   (yerleri Project Structure > Libraries'te). **sl_sdk.jar kopyalanmaz**: bat BO kurulumundakini classpath'te en başa koyar.
+4. `run_webidocuments.bat` → `...\BOTOOLS\`, `credentials.json` → `...\BOTOOLS\config\`.
 5. `run_webidocuments.bat --env all --limit 20` ile deneyin; sonra Görev Zamanlayıcı'ya `--env all --apply`.
 
 ## Önerilen akış
