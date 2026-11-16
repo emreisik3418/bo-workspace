@@ -145,12 +145,12 @@ Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8I
 
 ## Jar ve bat ile çalıştırma (IntelliJ)
 1. File > Project Structure > Artifacts > + > JAR > **Empty**. Ad `bo-tools`, Output directory
-   `C:\batchs\BusinessObjects\BOTOOLS\lib`, jar adı `bo-tools.jar`. Sağdaki Available Elements'ten
+   `C:\batchs\BusinessObjects\WEBIDOCUMENTS\lib`, jar adı `bo-tools.jar`. Sağdaki Available Elements'ten
    **'bo-tools' compile output**'u jar'ın içine ekleyin. **Kütüphane eklemeyin** (BO_SDK hiç; diğerleri ayrı klasörde).
 2. Build > Build Artifacts > bo-tools > Build (kod değişince Rebuild).
-3. Bir kez: SOAP_AXIS, ORACLE_JDBC, JSON kütüphanelerinin jar'larını `...\BOTOOLS\lib\bo-tools_lib\` altına kopyalayın
+3. Bir kez: SOAP_AXIS, ORACLE_JDBC, JSON kütüphanelerinin jar'larını `...\WEBIDOCUMENTS\lib\bo-tools_lib\` altına kopyalayın
    (yerleri Project Structure > Libraries'te). **sl_sdk.jar kopyalanmaz**: bat BO kurulumundakini classpath'te en başa koyar.
-4. `run_webidocuments.bat` → `...\BOTOOLS\`, `credentials.json` → `...\BOTOOLS\config\`.
+4. `run_webidocuments.bat` → `...\WEBIDOCUMENTS\`, `credentials.json` → `...\WEBIDOCUMENTS\config\`.
 5. `run_webidocuments.bat --env all --limit 20` ile deneyin; sonra Görev Zamanlayıcı'ya `--env all --apply`.
 
 ## Önerilen akış

@@ -9,7 +9,8 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 - Universe obje/tablo eşlemesi ayrı iş olarak `universe-object-mapping` reposunda kalır; onunla ilgili işler oraya.
 - `bo-tools` içindeki `app`, `config`, `credential`, `model`, `sdk` paketleri universe-object-mapping'dekinin kopyası;
   birinde düzeltme yapılırsa diğerine de taşı. Ortam seçimi + yeniden denemeli logon: `common.BoLogon`.
-- Toplu çalıştırma: `bo-tools\run_*.bat` → `C:\batchs\BusinessObjects\BOTOOLS\lib\bo-tools.jar` + `lib\bo-tools_lib\*`
+- Toplu çalıştırma: `bo-tools\run_*.bat` → `C:\batchs\BusinessObjects\<KLASOR>\lib\bo-tools.jar` + `lib\bo-tools_lib\*`
+  (keyword: `BOTOOLS`, webidocuments: `WEBIDOCUMENTS`)
   (IntelliJ Artifacts > JAR > Empty, sadece modül çıktısı; axis/ojdbc/json bir kez elle kopyalanır). sl_sdk.jar BO kurulumundan ve
   classpath'te EN BAŞTA, kopyalanmaz; `java -jar` değil `-cp` + main class (kopya sl_sdk.jar'ın manifest Class-Path'i bozulur).
 - İşler:

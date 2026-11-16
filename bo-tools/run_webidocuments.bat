@@ -11,7 +11,7 @@ rem --apply verilmezse DRY-RUN: DB'ye yazilmaz, sadece reports\ altina CSV yazil
 rem Cikis kodu: 0 tum ortamlar basarili, 1 kismi, 2 hicbir ortam islenemedi.
 setlocal
 set BO=C:\Program Files (x86)\SAP BusinessObjects\SAP BusinessObjects Enterprise XI 4.0
-set APP=C:\batchs\BusinessObjects\BOTOOLS
+set APP=C:\batchs\BusinessObjects\WEBIDOCUMENTS
 rem Klasor yapisi (IntelliJ > Build Artifacts, bo-tools.jar = sadece modul ciktisi; kutuphaneler elle kopyalanir):
 rem   %APP%\lib\bo-tools.jar           bizim siniflar
 rem   %APP%\lib\bo-tools_lib\*.jar     axis, ojdbc, json kutuphaneleri (bir kez kopyalanir)
