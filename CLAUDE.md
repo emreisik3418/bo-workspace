@@ -9,7 +9,9 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
 - Universe obje/tablo eşlemesi ayrı iş olarak `universe-object-mapping` reposunda kalır; onunla ilgili işler oraya.
 - `bo-tools` içindeki `app`, `config`, `credential`, `model`, `sdk` paketleri universe-object-mapping'dekinin kopyası;
   birinde düzeltme yapılırsa diğerine de taşı. Ortam seçimi + yeniden denemeli logon: `common.BoLogon`.
-- Toplu çalıştırma: `bo-tools\run_*.bat` → `C:\batchs\BusinessObjects\BOTOOLS\lib\bo-tools.jar`.
+- Toplu çalıştırma: `bo-tools\run_*.bat` → `C:\batchs\BusinessObjects\BOTOOLS\lib\bo-tools.jar` + `lib\bo-tools_lib\*`
+  (Eclipse Runnable JAR, "Copy required libraries into a sub-folder"). sl_sdk.jar BO kurulumundan ve classpath'te EN BAŞTA;
+  kopyalanan sl_sdk.jar silinir; `java -jar` değil `-cp` + main class (kopya sl_sdk.jar'ın manifest Class-Path'i bozulur).
 - İşler:
   - `keyword` `ReportKeywordApp`: txt'deki rapor CUID'lerinin Keywords alanına etiket (`Arşiv`) ekler; dry-run / `--apply`,
     CSV yedek + doğrulama. SDK: `IInfoObject.getKeyword/setKeyword/save` (gerçek SDK'da henüz doğrulanmadı).

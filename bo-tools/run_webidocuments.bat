@@ -12,8 +12,19 @@ rem Cikis kodu: 0 tum ortamlar basarili, 1 kismi, 2 hicbir ortam islenemedi.
 setlocal
 set BO=C:\Program Files (x86)\SAP BusinessObjects\SAP BusinessObjects Enterprise XI 4.0
 set APP=C:\batchs\BusinessObjects\BOTOOLS
-set CP=%APP%\lib\bo-tools.jar;%BO%\SL SDK\java\sl_sdk.jar;%APP%\lib\axis\*;%APP%\lib\oracle\*;%APP%\lib\json\*
+rem Klasor yapisi (Eclipse > Export > Runnable JAR file > "Copy required libraries into a sub-folder"):
+rem   %APP%\lib\bo-tools.jar           bizim siniflar
+rem   %APP%\lib\bo-tools_lib\*.jar     Eclipse'in kopyaladigi kutuphaneler (axis, ojdbc, json)
+rem   %APP%\config\credentials.json
+rem sl_sdk.jar BO kurulumundan ve EN BASTA verilir: manifest Class-Path'i diger BO jar'larini
+rem kurulum klasorune gore yukler. bo-tools_lib altina kopyalanan sl_sdk.jar silinmeli.
+rem java -jar KULLANILMAZ (kopyalanan sl_sdk.jar'in Class-Path'i bozulur); -cp + main class verilir.
+set CP=%BO%\SL SDK\java\sl_sdk.jar;%APP%\lib\bo-tools.jar;%APP%\lib\bo-tools_lib\*
 
+if exist "%APP%\lib\bo-tools_lib\sl_sdk.jar" (
+  echo HATA: %APP%\lib\bo-tools_lib\sl_sdk.jar silinmeli, BO kurulumundaki kullanilir.
+  exit /b 2
+)
 if not exist "%APP%\work" mkdir "%APP%\work"
 cd /d "%APP%\work"
 
