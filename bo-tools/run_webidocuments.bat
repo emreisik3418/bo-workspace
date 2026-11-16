@@ -2,6 +2,7 @@
 rem Public Folders altindaki Webi raporlarinin sorgu ve universe bilgilerini
 rem EXT.EXT_TBOE_SDK_METADATA_WEBIREP tablosuna yazar.
 rem Kullanim:
+rem   run_webidocuments.bat                       parametresiz = --env all --apply (tam calisma)
 rem   run_webidocuments.bat --env all [--no-query] [--full] [--apply] [--force]
 rem   run_webidocuments.bat --env HOST:6400 [--rest URL] [--no-query] [--apply] [--force]
 rem --apply verilmezse DRY-RUN: DB'ye yazilmaz, sadece reports altina CSV yazilir. Log: logs altinda.
@@ -16,9 +17,13 @@ set "CP=%BO%\SL SDK\java\sl_sdk.jar;%APP%\lib\bo-tools.jar;%APP%\lib\bo-tools_li
 set "MAIN=com.akbank.analytics.applications.bo.webidocuments.WebiDocumentsApp"
 
 if exist "%APP%\lib\bo-tools_lib\sl_sdk.jar" goto kopya_sdk
+rem Parametresiz calistirilirsa tam calisma: tum ortamlar, DB'ye yazar (Gorev Zamanlayici icin)
+set "ARGS=%*"
+if "%~1"=="" set "ARGS=--env all --apply"
+echo Parametreler: %ARGS%
 cd /d "%APP%"
 
-"%BO%\win64_x64\sapjvm\bin\java.exe" -Xmx2g "-Djava.library.path=%BO%\win64_x64" "-Dbusinessobjects.connectivity.directory=%BO%\dataAccess\connectionServer" -cp "%CP%" %MAIN% "%APP%\config\credentials.json" %*
+"%BO%\win64_x64\sapjvm\bin\java.exe" -Xmx2g "-Djava.library.path=%BO%\win64_x64" "-Dbusinessobjects.connectivity.directory=%BO%\dataAccess\connectionServer" -cp "%CP%" %MAIN% "%APP%\config\credentials.json" %ARGS%
 exit /b %ERRORLEVEL%
 
 :kopya_sdk

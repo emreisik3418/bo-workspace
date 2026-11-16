@@ -151,7 +151,7 @@ Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8I
 3. Bir kez: SOAP_AXIS, ORACLE_JDBC, JSON kütüphanelerinin jar'larını `...\WEBIDOCUMENTS\lib\bo-tools_lib\` altına kopyalayın
    (yerleri Project Structure > Libraries'te). **sl_sdk.jar kopyalanmaz**: bat BO kurulumundakini classpath'te en başa koyar.
 4. `run_webidocuments.bat` → `...\WEBIDOCUMENTS\`, `credentials.json` → `...\WEBIDOCUMENTS\config\`.
-5. `run_webidocuments.bat --env all --limit 20` ile deneyin (log `logs\`, CSV `reports\` altına, bat'ın olduğu klasörde); sonra Görev Zamanlayıcı'ya `--env all --apply`.
+5. `run_webidocuments.bat --env all --limit 20` ile deneyin (log `logs\`, CSV `reports\` altına, bat'ın olduğu klasörde); sonra Görev Zamanlayıcı'ya parametresiz `run_webidocuments.bat` (= `--env all --apply`).
 
 ## Önerilen akış
 1. `--limit 20` ile dry-run: CSV'de QUERY / DATASOURCE kolonlarını kontrol edin.
