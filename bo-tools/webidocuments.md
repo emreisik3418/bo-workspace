@@ -11,7 +11,7 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
 |---|---|
 | `NEW`: DB'de yok | REST'ten sorgular okunur, yazılır |
 | `CHANGED`: `UPDATED_TIME` farklı | Raporun eski satırları silinir, yenileri yazılır |
-| `RETRY`: DB'de sorgusu boş satırı var | Tekrar denenir (önceki REST hatası, `--no-query`, sorgusuz rapor); `DOSYA YOK` işaretliler hariç |
+| `RETRY`: DB'de sorgusu boş satırı var | Tekrar denenir (önceki REST hatası, `--no-query`, sorgusuz rapor); `FILE NOT FOUND` işaretliler hariç |
 | `UNCHANGED`: aynı | **Dokunulmaz, REST'e gidilmez** (günlük çalışmayı hızlandıran kısım) |
 | CMS listesinde yok | DB'den silinir (`DELETED`); sadece liste tam okunduysa |
 
@@ -21,9 +21,9 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
   **DB'de olan** rapora dokunulmaz, eski satırlar korunur (`SKIPPED`), ertesi gün tekrar denenir.
 - **Dosyası depoda olmayan raporlar:** `WIS 30951` ("document cannot be retrieved from the File Repository Server";
   ör. silinen raporlar için tutulan yedekler) raporun kendisinin sorunudur. Rapor CMS universe bilgisiyle ve
-  `QUERY_NAME = 'DOSYA YOK (WIS 30951)'` işaretiyle yazılır (CSV DURUM `NO_FILE`). İşaretli rapor her gün tekrar
+  `QUERY_NAME = 'FILE NOT FOUND (WIS 30951)'` işaretiyle yazılır (CSV DURUM `NO_FILE`). İşaretli rapor her gün tekrar
   denenmez; CMS'te değişirse (UPDATED_TIME) ya da `--full` ile yeniden denenir. Art arda hata sayacına girmez ve
-  işin sonucunu (çıkış kodu) etkilemez. Listelemek için: `WHERE QUERY_NAME = 'DOSYA YOK (WIS 30951)'`.
+  işin sonucunu (çıkış kodu) etkilemez. Listelemek için: `WHERE QUERY_NAME = 'FILE NOT FOUND (WIS 30951)'`.
   İlk tam çalıştırmada GMP03, SI_ID'leri ardışık bozuk bir grup yüzünden 11.309. rapordan sonra durmuştu.
 - **REST oturumu yenileme:** diğer REST hatalarında oturum yenilenip (eski oturum logoff) rapor bir kez daha denenir;
   ayrıca 1000 raporda bir oturum düzenli yenilenir.

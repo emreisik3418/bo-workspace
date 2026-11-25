@@ -14,7 +14,7 @@ final class WebiDocumentRow {
      * Dosyası depoda olmayan raporların QUERY_NAME işareti (ASCII). Bu işaretli satırlar "sorgusu boş" sayılmaz:
      * rapor her gün tekrar denenmez, sadece CMS'te değişirse (UPDATED_TIME) ya da --full ile yeniden denenir.
      */
-    static final String NO_FILE_MARKER = "DOSYA YOK (WIS 30951)";
+    static final String NO_FILE_MARKER = "FILE NOT FOUND (WIS 30951)";
 
     final WebiDocument doc;
     String status;
