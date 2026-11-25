@@ -1,0 +1,150 @@
+-- =====================================================================================
+-- webidocuments: eski tablo ile yeni tablo karsilastirma sorgulari
+--   ESKI_TABLO -> eski uygulamanin tablosu   (ornek: POPR.SDK_METADATA_WEBIDOCUMENTS)
+--   YENI_TABLO -> yeni uygulamanin tablosu   (ornek: EXT.EXT_TBOE_SDK_METADATA_WEBIREP)
+-- Kullanmadan once Ctrl+R (Bul / Degistir) ile ESKI_TABLO ve YENI_TABLO adlarini degistirin.
+-- SYSTEM degerindeki port (":6400") her sorguda temizlenir; iki tablo portlu / portsuz olsa da eslesir.
+-- Her sorgu ";" ile biter; SQL Developer'da imleci sorgunun icine koyup Ctrl+Enter ile tek tek calistirin.
+-- =====================================================================================
+
+
+-- -------------------------------------------------------------------------------------
+-- 1) Ortam basina satir ve rapor sayisi
+-- -------------------------------------------------------------------------------------
+SELECT NVL(e.SYS, y.SYS) AS SYSTEM,
+       e.SATIR AS ESKI_SATIR, y.SATIR AS YENI_SATIR,
+       e.RAPOR AS ESKI_RAPOR, y.RAPOR AS YENI_RAPOR,
+       NVL(y.RAPOR, 0) - NVL(e.RAPOR, 0) AS RAPOR_FARKI
+FROM (SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, COUNT(*) SATIR, COUNT(DISTINCT CUID) RAPOR
+      FROM ESKI_TABLO GROUP BY REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '')) e
+FULL OUTER JOIN
+     (SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, COUNT(*) SATIR, COUNT(DISTINCT CUID) RAPOR
+      FROM YENI_TABLO GROUP BY REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '')) y
+  ON e.SYS = y.SYS
+ORDER BY 1;
+
+
+-- -------------------------------------------------------------------------------------
+-- 2) Sadece bir tabloda olan rapor sayisi
+-- -------------------------------------------------------------------------------------
+SELECT SYS AS SYSTEM, KAYNAK, COUNT(*) AS RAPOR
+FROM (
+  SELECT SYS, CUID, 'SADECE_ESKI' KAYNAK FROM (
+    SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM ESKI_TABLO
+    MINUS
+    SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM YENI_TABLO)
+  UNION ALL
+  SELECT SYS, CUID, 'SADECE_YENI' FROM (
+    SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM YENI_TABLO
+    MINUS
+    SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM ESKI_TABLO))
+GROUP BY SYS, KAYNAK
+ORDER BY 1, 2;
+
+
+-- -------------------------------------------------------------------------------------
+-- 3) Sadece eskide olan raporlar hangi klasorlerde (Inbox, silinmis raporlar vb.)
+-- -------------------------------------------------------------------------------------
+SELECT REGEXP_REPLACE(o.SYSTEM, ':[0-9]+$', '') AS SYSTEM,
+       REGEXP_SUBSTR(o.PATH, '[^/]+', 1, 1) AS KLASOR1,
+       REGEXP_SUBSTR(o.PATH, '[^/]+', 1, 2) AS KLASOR2,
+       COUNT(DISTINCT o.CUID) AS RAPOR
+FROM ESKI_TABLO o
+WHERE NOT EXISTS (SELECT 1 FROM YENI_TABLO n
+                  WHERE REGEXP_REPLACE(n.SYSTEM, ':[0-9]+$', '') = REGEXP_REPLACE(o.SYSTEM, ':[0-9]+$', '')
+                    AND n.CUID = o.CUID)
+GROUP BY REGEXP_REPLACE(o.SYSTEM, ':[0-9]+$', ''),
+         REGEXP_SUBSTR(o.PATH, '[^/]+', 1, 1), REGEXP_SUBSTR(o.PATH, '[^/]+', 1, 2)
+ORDER BY 4 DESC;
+
+
+-- -------------------------------------------------------------------------------------
+-- 4) Veri kaynagi (DATASOURCE) karsilastirma - ozet
+--    Iki tabloda da olan raporlarda, rapor basina veri kaynagi kumeleri karsilastirilir.
+--    Eski tablo: raporun CMS universe listesi (SI_UNIVERSE). Yeni tablo: sorgularin gercek kaynagi.
+--    2_AYNI                    : ayni
+--    5_ESKIDE_FAZLA_UNIVERSE   : eskide fazladan universe var (CMS'te kalmis, sorguda kullanilmayan) - beklenen
+--    6_YENIDE_FAZLA_UNIVERSE   : yenide fazladan kaynak var (rapor eski yazimdan sonra degismis olabilir)
+--    3_YENIDE_BOS / 4_ESKIDE_BOS / 7_TAMAMEN_FARKLI / 1_IKISINDE_DE_BOS
+-- -------------------------------------------------------------------------------------
+WITH ortak AS (
+  SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM ESKI_TABLO
+  INTERSECT
+  SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM YENI_TABLO),
+e AS (SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID, DATASOURCE_CUID DS
+      FROM ESKI_TABLO WHERE DATASOURCE_CUID IS NOT NULL),
+y AS (SELECT DISTINCT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID, DATASOURCE_CUID DS
+      FROM YENI_TABLO WHERE DATASOURCE_CUID IS NOT NULL),
+en AS (SELECT SYS, CUID, COUNT(*) N FROM e GROUP BY SYS, CUID),
+yn AS (SELECT SYS, CUID, COUNT(*) N FROM y GROUP BY SYS, CUID),
+kn AS (SELECT e.SYS, e.CUID, COUNT(*) N FROM e JOIN y ON y.SYS = e.SYS AND y.CUID = e.CUID AND y.DS = e.DS
+       GROUP BY e.SYS, e.CUID),
+r AS (SELECT o.SYS, o.CUID, NVL(en.N, 0) E_N, NVL(yn.N, 0) Y_N, NVL(kn.N, 0) K_N
+      FROM ortak o
+      LEFT JOIN en ON en.SYS = o.SYS AND en.CUID = o.CUID
+      LEFT JOIN yn ON yn.SYS = o.SYS AND yn.CUID = o.CUID
+      LEFT JOIN kn ON kn.SYS = o.SYS AND kn.CUID = o.CUID),
+d AS (SELECT SYS,
+             CASE WHEN E_N = 0 AND Y_N = 0     THEN '1_IKISINDE_DE_BOS'
+                  WHEN E_N = Y_N AND Y_N = K_N THEN '2_AYNI'
+                  WHEN Y_N = 0                 THEN '3_YENIDE_BOS'
+                  WHEN E_N = 0                 THEN '4_ESKIDE_BOS'
+                  WHEN K_N = Y_N               THEN '5_ESKIDE_FAZLA_UNIVERSE'
+                  WHEN K_N = E_N               THEN '6_YENIDE_FAZLA_UNIVERSE'
+                  ELSE                              '7_TAMAMEN_FARKLI' END AS DURUM
+      FROM r)
+SELECT SYS AS SYSTEM, DURUM, COUNT(*) AS RAPOR
+FROM d
+GROUP BY SYS, DURUM
+ORDER BY 1, 2;
+
+
+-- -------------------------------------------------------------------------------------
+-- 5) Veri kaynagi karsilastirma - ayrinti: farkli raporlarda hangi kaynak hangi tarafta
+-- -------------------------------------------------------------------------------------
+WITH ortak AS (
+  SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM ESKI_TABLO
+  INTERSECT
+  SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID FROM YENI_TABLO),
+e AS (SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID, DATASOURCE_CUID DS,
+             MAX(DATASOURCE_NAME) DSN, MAX(NAME) RAPOR
+      FROM ESKI_TABLO WHERE DATASOURCE_CUID IS NOT NULL
+      GROUP BY REGEXP_REPLACE(SYSTEM, ':[0-9]+$', ''), CUID, DATASOURCE_CUID),
+y AS (SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID, DATASOURCE_CUID DS,
+             MAX(DATASOURCE_NAME) DSN, MAX(NAME) RAPOR
+      FROM YENI_TABLO WHERE DATASOURCE_CUID IS NOT NULL
+      GROUP BY REGEXP_REPLACE(SYSTEM, ':[0-9]+$', ''), CUID, DATASOURCE_CUID)
+SELECT 'SADECE_ESKI' TARAF, e.SYS AS SYSTEM, e.CUID, e.RAPOR, e.DS AS DATASOURCE_CUID, e.DSN AS DATASOURCE_NAME
+FROM e JOIN ortak o ON o.SYS = e.SYS AND o.CUID = e.CUID
+WHERE NOT EXISTS (SELECT 1 FROM y WHERE y.SYS = e.SYS AND y.CUID = e.CUID AND y.DS = e.DS)
+UNION ALL
+SELECT 'SADECE_YENI', y.SYS, y.CUID, y.RAPOR, y.DS, y.DSN
+FROM y JOIN ortak o ON o.SYS = y.SYS AND o.CUID = y.CUID
+WHERE NOT EXISTS (SELECT 1 FROM e WHERE e.SYS = y.SYS AND e.CUID = y.CUID AND e.DS = y.DS)
+ORDER BY 2, 3, 1;
+
+
+-- -------------------------------------------------------------------------------------
+-- 6) Yeni tabloda veri kaynagi bos olanlarin sebebi
+--    DOSYA_YOK            : dosyasi depoda olmayan rapor (WIS 30951)
+--    SORGUSU_YOK          : raporda sorgu yok
+--    UNIVERSE_DISI_KAYNAK : Excel, serbest SQL, BEx vb. (universe degil)
+-- -------------------------------------------------------------------------------------
+SELECT SYS AS SYSTEM, SEBEP, COUNT(DISTINCT CUID) AS RAPOR
+FROM (SELECT REGEXP_REPLACE(SYSTEM, ':[0-9]+$', '') SYS, CUID,
+             CASE WHEN QUERY_NAME = 'FILE NOT FOUND (WIS 30951)' THEN 'DOSYA_YOK'
+                  WHEN QUERY_ID IS NULL                          THEN 'SORGUSU_YOK'
+                  ELSE                                                'UNIVERSE_DISI_KAYNAK' END AS SEBEP
+      FROM YENI_TABLO
+      WHERE DATASOURCE_CUID IS NULL)
+GROUP BY SYS, SEBEP
+ORDER BY 1, 3 DESC;
+
+
+-- -------------------------------------------------------------------------------------
+-- 7) Dosyasi depoda olmayan raporlarin listesi (yeni tablo)
+-- -------------------------------------------------------------------------------------
+SELECT DISTINCT SYSTEM, CUID, NAME, PATH
+FROM YENI_TABLO
+WHERE QUERY_NAME = 'FILE NOT FOUND (WIS 30951)'
+ORDER BY 1, 4, 3;

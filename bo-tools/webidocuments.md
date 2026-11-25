@@ -168,3 +168,7 @@ Okurken Türkçe metinleri `TO_NCHAR(NAME)` vb. ile seçin (bkz. CLAUDE.md, WE8I
 - `SI_UNIVERSE` / `SI_DSL_UNIVERSE` torbalarının `SI_TOTAL` + `"1"`, `"2"` anahtarlarıyla geldiği.
 - `getLogonTokenMgr().createLogonToken(...)` token'ının REST'te kabul edildiği ve ek lisans harcamadığı.
 - REST yanıtında `dataSourceId`'nin universe SI_ID'si olduğu (UNV ve UNX için).
+
+## Karşılaştırma sorguları
+`bo-tools/sql/webidocuments_karsilastirma.txt`: eski / yeni tablo rapor sayıları, sadece bir tarafta olanlar,
+veri kaynağı (DATASOURCE) karşılaştırması, dosyası olmayan raporlar. Tablo adları `ESKI_TABLO` / `YENI_TABLO` (değiştirin).
