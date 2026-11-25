@@ -20,7 +20,9 @@ Yeni bir oturuma başlarken önce bunu oku. Kullanıcıyla Türkçe konuş.
     bilgilerini `EXT.EXT_TBOE_SDK_METADATA_WEBIREP` tablosuna yazar (satır = rapor x sorgu). Günlük ARTIMLI:
     UPDATED_TIME aynıysa dokunma, yeni/değişen/sorgusu boş olanı rapor başına sil+yaz+COMMIT, CMS'te olmayanı sil (%10 koruması);
     her rapor işlenince REST'te kapatılır; REST hatasında oturum yenilenip bir kez daha denenir, 1000 raporda bir düzenli yenileme.
-    WIS 30951 (dosya FRS'de yok, bozuk rapor; SI_ID'leri ardışık gruplar halinde) rapor hatasıdır: tekrar yok, art arda sayacına girmez.
+    WIS 30951 (dosya FRS'de yok; silinen raporların yedekleri, SI_ID'leri ardışık gruplar halinde) rapor hatasıdır: oturum yenilenmez,
+    art arda sayacına ve çıkış koduna girmez; QUERY_NAME='DOSYA YOK (WIS 30951)' işaretiyle yazılır, işaretli rapor sadece
+    UPDATED_TIME değişince / --full ile tekrar denenir (loadState işareti SQL CASE ile okur, QUERY_NAME metni okunmaz).
     SYSTEM portsuz yazılır (eski tablo POPR.SDK_METADATA_WEBIDOCUMENTS ile aynı: WBO42GMP03); portlu eski satırlar bir kez taşınır. Bağlantı testi ilk 5 rapordan biriyle (tek bozuk rapor ortamı düşürmesin).
     Sorgular Webi RESTful (raylight, port 6405). CMS SI_PARENTID: üst klasörler 23 değil 0 geliyor. SDK `createLogonToken`
     ile raylight WSR 00999 (`reCtx` null) verdi → token yöntemleri sırayla denenir (logon / serialized / rest `/logon/long`);

@@ -157,9 +157,12 @@ final class WebiDocumentsDao {
         Map<String, Date> maxDate = new HashMap<>();
         Map<String, int[]> counts = new HashMap<>();   // {satır, sorgusu boş, okunamayan tarih}
         Map<String, Integer> patterns = new HashMap<>();
-        String sql = "SELECT CUID, UPDATED_TIME, QUERY_ID, ROW_ID FROM " + table + " WHERE SYSTEM = ?";
+        // 5. kolon: dosyası depoda olmayan rapor işareti (QUERY_NAME metni okunmaz: Türkçe karakter sorunu olmasın)
+        String sql = "SELECT CUID, UPDATED_TIME, QUERY_ID, ROW_ID, CASE WHEN QUERY_NAME = ? THEN 1 ELSE 0 END FROM "
+                + table + " WHERE SYSTEM = ?";
         try (PreparedStatement ps = c.prepareStatement(sql)) {
-            ps.setString(1, system);
+            ps.setString(1, WebiDocumentRow.NO_FILE_MARKER);
+            ps.setString(2, system);
             ps.setFetchSize(5000);
             try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -189,6 +192,7 @@ final class WebiDocumentsDao {
                     }
                     String queryId = rs.getString(3);
                     String rowId = rs.getString(4);
+                    boolean noFile = rs.getInt(5) == 1;
                     info.rows++;
                     if (rowId != null) {
                         try {
@@ -201,7 +205,7 @@ final class WebiDocumentsDao {
                     int[] k = counts.get(cuid);
                     if (k == null) counts.put(cuid, k = new int[3]);
                     k[0]++;
-                    if (queryId == null) k[1]++;
+                    if (queryId == null && !noFile) k[1]++;   // işaretli (dosyası yok) satırlar tekrar denenmez
                     if (unparsed) k[2]++;
                     Date m = maxDate.get(cuid);
                     if (updated != null && (m == null || updated.after(m))) maxDate.put(cuid, updated);

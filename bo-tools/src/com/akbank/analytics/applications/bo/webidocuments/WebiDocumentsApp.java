@@ -316,6 +316,7 @@ public final class WebiDocumentsApp {
                                 rows = buildRows(d, null, null);
                             } else {
                                 String restError = null;
+                                boolean docError = false;
                                 List<WebiRestClient.DataProvider> dps = null;
                                 if (done > 1 && (done - 1) % RENEW_EVERY_DOCS == 0) {
                                     renewQuietly(rest, "düzenli yenileme (" + RENEW_EVERY_DOCS + " raporda bir)", log);
@@ -327,8 +328,8 @@ public final class WebiDocumentsApp {
                                     if (WebiRestClient.isDocumentError(first)) {
                                         // Raporun kendisi bozuk (ör. dosya deposunda yok): oturumla ilgisi yok, tekrar denenmez,
                                         // art arda hata sayacına da girmez (bozuk raporlar SI_ID sırasında yan yana gelebiliyor)
-                                        restFailed++;
                                         docErrors++;
+                                        docError = true;
                                         restError = RunLog.describe(first);
                                         log.warn("[" + d.cuid + "] " + d.name + " raporu sunucuda açılamıyor: " + restError);
                                     } else {
@@ -345,12 +346,13 @@ public final class WebiDocumentsApp {
                                             retryOk++;
                                             log.info("[" + d.cuid + "] yeni oturumla okundu.");
                                         } catch (Exception e) {
-                                            restFailed++;
                                             restError = RunLog.describe(e);
                                             if (WebiRestClient.isDocumentError(e)) {
                                                 docErrors++;
+                                                docError = true;
                                                 log.warn("[" + d.cuid + "] " + d.name + " raporu sunucuda açılamıyor: " + restError);
                                             } else {
+                                                restFailed++;
                                                 restStreak++;
                                                 log.error("[" + d.cuid + "] " + d.name + " sorguları okunamadı", e);
                                             }
@@ -361,6 +363,9 @@ public final class WebiDocumentsApp {
                                 }
                                 if (restError == null) {
                                     rows = buildRows(d, dps, null);
+                                } else if (docError) {
+                                    // Dosyası depoda yok: işaretle yaz (yeni ya da mevcut fark etmez), her gün tekrar denenmesin
+                                    rows = buildNoFileRows(d, restError);
                                 } else if (action == SyncPlan.Action.NEW) {
                                     rows = buildRows(d, null, restError);   // yeni rapor: CMS universe bilgisiyle yaz, yarın tekrar denenir
                                 } else {
@@ -442,11 +447,14 @@ public final class WebiDocumentsApp {
                     }
 
                     if (retryOk > 0) log.info("Yeni REST oturumuyla kurtarılan rapor: " + retryOk);
-                    if (docErrors > 0) log.info("Sunucuda açılamayan (bozuk) rapor: " + docErrors + " (CSV'de NOT kolonunda WIS kodu)");
+                    if (docErrors > 0) {
+                        log.info("Dosyası depoda olmayan rapor: " + docErrors + " (QUERY_NAME = '" + WebiDocumentRow.NO_FILE_MARKER
+                                + "' olarak yazıldı; rapor CMS'te değişmedikçe tekrar denenmez, işin sonucunu etkilemez)");
+                    }
                     log.info(String.format("[%s] Sonuç: işlenen %d / %d, yazılan %d rapor (%d satır), değişmeyen %d,"
-                                    + " REST hatası %d (DB'deki korunan %d), DB hatası %d, silinen rapor %d%s",
+                                    + " dosyası yok %d, REST hatası %d (DB'deki korunan %d), DB hatası %d, silinen rapor %d%s",
                             cms, done, work.size(), written, writtenRows, plan.count(SyncPlan.Action.UNCHANGED),
-                            restFailed, kept, dbFailed, deleteSkipped ? 0 : (o.apply ? plan.toDelete.size() : 0),
+                            docErrors, restFailed, kept, dbFailed, deleteSkipped ? 0 : (o.apply ? plan.toDelete.size() : 0),
                             o.apply ? "" : " (DRY-RUN: DB'ye yazılmadı)"));
                     if (aborted) return 2;
                     return restFailed > 0 || dbFailed > 0 || deleteSkipped ? 1 : 0;
@@ -589,6 +597,16 @@ public final class WebiDocumentsApp {
      * REST'ten gelen sorgulardan satırlar. providers null ise (REST hatası / --no-query) CMS'teki universe'lerden:
      * universe başına bir satır, QUERY alanları boş. Sorgusu / universe'ü olmayan rapor yine tek satır olarak yazılır.
      */
+    /** Dosyası depoda olmayan rapor: CMS universe bilgisiyle satırlar, QUERY_NAME işaretli, DURUM NO_FILE. */
+    static List<WebiDocumentRow> buildNoFileRows(WebiDocument d, String restError) {
+        List<WebiDocumentRow> rows = buildRows(d, null, restError);
+        for (WebiDocumentRow r : rows) {
+            r.status = WebiDocumentRow.S_NO_FILE;
+            r.queryName = WebiDocumentRow.NO_FILE_MARKER;
+        }
+        return rows;
+    }
+
     static List<WebiDocumentRow> buildRows(WebiDocument d, List<WebiRestClient.DataProvider> providers, String restError) {
         List<WebiDocumentRow> out = new ArrayList<>();
         if (providers != null) {

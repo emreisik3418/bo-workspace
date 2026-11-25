@@ -11,7 +11,7 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
 |---|---|
 | `NEW`: DB'de yok | REST'ten sorgular okunur, yazılır |
 | `CHANGED`: `UPDATED_TIME` farklı | Raporun eski satırları silinir, yenileri yazılır |
-| `RETRY`: DB'de sorgusu boş satırı var | Tekrar denenir (önceki REST hatası, `--no-query`, sorgusuz rapor) |
+| `RETRY`: DB'de sorgusu boş satırı var | Tekrar denenir (önceki REST hatası, `--no-query`, sorgusuz rapor); `DOSYA YOK` işaretliler hariç |
 | `UNCHANGED`: aynı | **Dokunulmaz, REST'e gidilmez** (günlük çalışmayı hızlandıran kısım) |
 | CMS listesinde yok | DB'den silinir (`DELETED`); sadece liste tam okunduysa |
 
@@ -19,8 +19,11 @@ Her ortamda önce DB'deki mevcut durum (`CUID` → `UPDATED_TIME`) okunur, CMS l
   İş yarıda kesilirse o ana kadar yazılanlar kalır; ertesi çalıştırma onları `UNCHANGED` sayar, kalanlardan devam eder.
 - REST hatası: **yeni** rapor CMS universe bilgisiyle yazılır (QUERY boş → ertesi gün `RETRY`);
   **DB'de olan** rapora dokunulmaz, eski satırlar korunur (`SKIPPED`), ertesi gün tekrar denenir.
-- **Bozuk raporlar:** `WIS 30951` ("document cannot be retrieved from the File Repository Server": dosya depoda yok)
-  raporun kendisinin sorunudur: tekrar denenmez, art arda hata sayacına girmez (WARN; CSV `NOT` kolonunda kod).
+- **Dosyası depoda olmayan raporlar:** `WIS 30951` ("document cannot be retrieved from the File Repository Server";
+  ör. silinen raporlar için tutulan yedekler) raporun kendisinin sorunudur. Rapor CMS universe bilgisiyle ve
+  `QUERY_NAME = 'DOSYA YOK (WIS 30951)'` işaretiyle yazılır (CSV DURUM `NO_FILE`). İşaretli rapor her gün tekrar
+  denenmez; CMS'te değişirse (UPDATED_TIME) ya da `--full` ile yeniden denenir. Art arda hata sayacına girmez ve
+  işin sonucunu (çıkış kodu) etkilemez. Listelemek için: `WHERE QUERY_NAME = 'DOSYA YOK (WIS 30951)'`.
   İlk tam çalıştırmada GMP03, SI_ID'leri ardışık bozuk bir grup yüzünden 11.309. rapordan sonra durmuştu.
 - **REST oturumu yenileme:** diğer REST hatalarında oturum yenilenip (eski oturum logoff) rapor bir kez daha denenir;
   ayrıca 1000 raporda bir oturum düzenli yenilenir.
@@ -100,7 +103,7 @@ universe başına bir satır yazılır, QUERY alanları boş kalır. Sorgusu / u
 **ISLEM:** `NEW`, `CHANGED`, `RETRY` (yazıldı / dry-run'da yazılacak), `FAILED` (DB hatası), `SKIPPED` (REST hatası,
 DB'deki satırlar korundu), `DELETED` / `DELETE` (dry-run) / `DELETE_SKIPPED` (silme koruması).
 
-**DURUM (satır):** `QUERY` (REST'ten sorgu okundu), `NO_QUERY` (raporda sorgu yok), `CMS_ONLY` (--no-query),
+**DURUM (satır):** `NO_FILE` (dosya depoda yok, işaretli), `QUERY` (REST'ten sorgu okundu), `NO_QUERY` (raporda sorgu yok), `CMS_ONLY` (--no-query),
 `REST_FAILED` (REST hatası; universe CMS'ten).
 
 ## DB
